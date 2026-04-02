@@ -33,31 +33,84 @@ const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
 sunLight.position.set(500, 200, 300);
 scene.add(sunLight);
 
-// --- Starfield ---
-function createStarfield() {
-  const count = 8000;
+// --- Starfield (real star positions from HYG catalog) ---
+async function createStarfield() {
+  const resp = await fetch('data/stars.json');
+  const stars = await resp.json(); // [[ra_hours, dec_deg, mag, ci], ...]
+  const count = stars.length;
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  const R = 9000;
+
   for (let i = 0; i < count; i++) {
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    const r = 8000 + Math.random() * 2000;
-    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-    positions[i * 3 + 2] = r * Math.cos(phi);
-    const brightness = 0.5 + Math.random() * 0.5;
-    const tint = Math.random();
-    colors[i * 3] = brightness * (tint > 0.8 ? 1.0 : 0.9);
-    colors[i * 3 + 1] = brightness * 0.92;
-    colors[i * 3 + 2] = brightness * (tint < 0.2 ? 1.0 : 0.95);
+    const [raH, decDeg, mag, ci] = stars[i];
+    // RA (hours -> radians), Dec (degrees -> radians)
+    const ra = raH * (Math.PI / 12);
+    const dec = decDeg * (Math.PI / 180);
+
+    // Equatorial to cartesian (J2000)
+    const x = R * Math.cos(dec) * Math.cos(ra);
+    const y = R * Math.cos(dec) * Math.sin(ra);
+    const z = R * Math.sin(dec);
+
+    // Same mapping as toScene: equatorial X->scene X, Z->scene Y, -Y->scene Z
+    positions[i * 3]     = x;
+    positions[i * 3 + 1] = z;
+    positions[i * 3 + 2] = -y;
+
+    // Brightness from magnitude (lower mag = brighter)
+    const brightness = Math.pow(10, -0.4 * (mag - (-1.46))) * 0.8; // normalized to Sirius
+    const b = Math.min(1.0, Math.max(0.15, brightness));
+
+    // Color from B-V color index: blue stars (ci < 0) -> white -> red stars (ci > 1.5)
+    let r2, g, b2;
+    if (ci < 0) {
+      r2 = 0.7; g = 0.8; b2 = 1.0;
+    } else if (ci < 0.4) {
+      r2 = 0.9; g = 0.95; b2 = 1.0;
+    } else if (ci < 0.8) {
+      r2 = 1.0; g = 1.0; b2 = 0.9;
+    } else if (ci < 1.2) {
+      r2 = 1.0; g = 0.85; b2 = 0.6;
+    } else {
+      r2 = 1.0; g = 0.7; b2 = 0.4;
+    }
+    colors[i * 3]     = r2 * b;
+    colors[i * 3 + 1] = g * b;
+    colors[i * 3 + 2] = b2 * b;
+
+    // Size from magnitude
+    sizes[i] = Math.max(0.5, 4.0 - mag * 0.5);
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const mat = new THREE.PointsMaterial({ size: 1.5, vertexColors: true, sizeAttenuation: false });
-  scene.add(new THREE.Points(geo, mat));
+
+  // Group stars by brightness tier for different point sizes
+  const tiers = [
+    { maxMag: 1.5, size: 4.0 },
+    { maxMag: 3.0, size: 2.5 },
+    { maxMag: 4.5, size: 1.5 },
+    { maxMag: 6.5, size: 0.8 },
+  ];
+
+  for (const tier of tiers) {
+    const tierPositions = [];
+    const tierColors = [];
+    for (let i = 0; i < count; i++) {
+      const mag = stars[i][2];
+      const prevMax = tiers[tiers.indexOf(tier) - 1]?.maxMag ?? -999;
+      if (mag > prevMax && mag <= tier.maxMag) {
+        tierPositions.push(positions[i*3], positions[i*3+1], positions[i*3+2]);
+        tierColors.push(colors[i*3], colors[i*3+1], colors[i*3+2]);
+      }
+    }
+    if (tierPositions.length === 0) continue;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(tierPositions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(tierColors, 3));
+    const mat = new THREE.PointsMaterial({ size: tier.size, vertexColors: true, sizeAttenuation: false });
+    scene.add(new THREE.Points(geo, mat));
+  }
 }
-createStarfield();
 
 // --- Texture loader ---
 const textureLoader = new THREE.TextureLoader();
@@ -306,6 +359,7 @@ async function init() {
     }
 
     buildTrajectoryLines();
+    createStarfield();
     elLoading.style.display = 'none';
     lastRealTime = performance.now();
     if (liveMode) pollTelemetry();
