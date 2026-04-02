@@ -707,6 +707,21 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'l' || e.key === 'L') document.getElementById('btn-live').click();
   if (e.key === 'u' || e.key === 'U') useImperial = !useImperial;
   if (e.key === 't' || e.key === 'T') useLocalTime = !useLocalTime;
+  if (e.key === '?') {
+    const modal = document.getElementById('shortcuts-modal');
+    modal.classList.toggle('open');
+  }
+});
+
+// --- Modals ---
+document.getElementById('shortcuts-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'shortcuts-modal') e.target.classList.remove('open');
+});
+document.getElementById('about-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'about-modal') e.target.classList.remove('open');
+});
+document.getElementById('btn-about').addEventListener('click', () => {
+  document.getElementById('about-modal').classList.add('open');
 });
 
 // --- Collapsible telemetry section ---
