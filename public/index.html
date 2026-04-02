@@ -40,6 +40,9 @@
     .section-body { display: none; }
     .section-body.open { display: block; }
     .telemetry-na { color: #445566; }
+    #about-link { font-size: 11px; color: #5580aa; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(100,140,255,0.15); }
+    #about-link a { color: #5580aa; text-decoration: none; }
+    #about-link a:hover { color: #7eb8ff; text-decoration: underline; }
     #info-panel { max-height: calc(100vh - 160px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(100,140,255,0.3) transparent; }
 
     #controls-panel {
@@ -135,6 +138,9 @@
       <div class="stat">
         <span class="stat-label">Last update</span><span class="stat-value" id="data-age"></span>
       </div>
+      <div id="trajectory-note" style="font-size:11px; color:#6688aa; margin-top:8px; padding-top:8px; border-top:1px solid rgba(100,140,255,0.15); line-height:1.4; display:none">
+        Trajectory line is a pre-launch<br>prediction from JPL Horizons<br>and may differ from actual position.
+      </div>
 
       <div class="section-header" id="toggle-telemetry">Raw Telemetry</div>
       <div class="section-body" id="section-telemetry">
@@ -162,6 +168,7 @@
         <div class="stat"><span class="stat-label">Status flag</span><span class="stat-value telemetry-na" id="status-flag">&mdash;</span></div>
         <div class="stat"><span class="stat-label">Altitude (telem)</span><span class="stat-value telemetry-na" id="telem-alt">&mdash;</span></div>
       </div>
+      <div id="about-link"><a href="https://github.com/iandees/artemis-viewer" target="_blank">About this project</a></div>
     </div>
   </div>
 
