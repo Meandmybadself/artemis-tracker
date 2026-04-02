@@ -181,22 +181,31 @@ orionGroup.add(orionRing);
 // Load GLB model
 new GLTFLoader().load('models/orion.glb', (gltf) => {
   const model = gltf.scene;
-  model.scale.setScalar(0.02);
+  model.scale.setScalar(3);
   // Align model with telemetry body frame
-  // Model: -Z = heat shield/nose, +Z = service module, X/Y = solar arrays
-  // Orion body frame: -X = nose direction. Rotate model -Z → -X (-90° around Y)
-  model.rotation.y = -Math.PI / 2;
+  // Model: +Y = CM/nose, -Y = SM, X/Z = solar arrays
+  // Orion body frame: +X = SM/sun-facing. Rotate model +Y (nose) → +X
+  model.rotation.z = -Math.PI / 2;
+  // Reposition SAW panels (manually aligned via panel-tool)
+  const sawTransforms = {
+    'SAW1': { pos: [0.4520, 0.1553, 0.4191], quat: [0.5540, -0.5397, -0.4297, 0.4659] },
+    'SAW2': { pos: [0.3998, 0.0327, -0.5514], quat: [-0.1406, -0.8442, -0.0016, 0.5173] },
+    'SAW3': { pos: [-0.6799, 0.0269, -0.0939], quat: [0.0678, -0.8513, 0.1263, 0.5048] },
+    'SAW4': { pos: [-0.4204, 0.0310, 0.5335], quat: [0.1420, -0.8550, 0.0044, 0.4988] },
+  };
   model.traverse((child) => {
     if (child.isMesh) {
-      const oldColor = child.material.color ? child.material.color.clone() : new THREE.Color(0xcccccc);
-      child.material = new THREE.MeshPhongMaterial({
-        vertexColors: !!child.geometry.attributes.color,
-        color: oldColor,
-        emissive: 0x334455,
-        emissiveIntensity: 0.3,
-        shininess: 20,
-        side: THREE.DoubleSide,
-      });
+      child.material = child.material.clone();
+      child.material.emissive = new THREE.Color(0x334455);
+      child.material.emissiveIntensity = 0.3;
+      child.material.side = THREE.DoubleSide;
+      child.material.metalness = 0.0;
+      child.material.roughness = 0.8;
+      const st = sawTransforms[child.name];
+      if (st) {
+        child.position.set(...st.pos);
+        child.quaternion.set(...st.quat);
+      }
     }
   });
   orionGroup.add(model);
