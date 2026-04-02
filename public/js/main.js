@@ -26,7 +26,7 @@ controls.minDistance = 1;
 controls.maxDistance = 5000;
 
 // --- Lighting ---
-const ambientLight = new THREE.AmbientLight(0x222244, 0.5);
+const ambientLight = new THREE.AmbientLight(0x222244, 0.3);
 scene.add(ambientLight);
 
 const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
@@ -93,10 +93,6 @@ const glowMat = new THREE.MeshBasicMaterial({
   side: THREE.BackSide,
 });
 scene.add(new THREE.Mesh(glowGeo, glowMat));
-
-// Earth grid lines (to give sense of rotation/scale)
-const earthGridMat = new THREE.MeshBasicMaterial({ color: 0x3366aa, wireframe: true, transparent: true, opacity: 0.15 });
-scene.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_RADIUS * 1.002, 24, 24), earthGridMat));
 
 // --- Moon ---
 const moonGeo = new THREE.SphereGeometry(MOON_RADIUS, 32, 32);
