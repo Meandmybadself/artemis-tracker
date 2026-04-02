@@ -59,6 +59,9 @@ function createStarfield() {
 }
 createStarfield();
 
+// --- Texture loader ---
+const textureLoader = new THREE.TextureLoader();
+
 // --- Earth ---
 const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
 const earthMat = new THREE.MeshPhongMaterial({
@@ -66,6 +69,17 @@ const earthMat = new THREE.MeshPhongMaterial({
   emissive: 0x112244,
   emissiveIntensity: 0.15,
   shininess: 25,
+});
+textureLoader.load('textures/earth.jpg', (tex) => {
+  earthMat.map = tex;
+  earthMat.color.set(0xffffff);
+  earthMat.needsUpdate = true;
+});
+textureLoader.load('textures/earth-night.jpg', (tex) => {
+  earthMat.emissiveMap = tex;
+  earthMat.emissive.set(0xffddaa);
+  earthMat.emissiveIntensity = 0.15;
+  earthMat.needsUpdate = true;
 });
 const earthMesh = new THREE.Mesh(earthGeo, earthMat);
 scene.add(earthMesh);
@@ -91,6 +105,12 @@ const moonMat = new THREE.MeshPhongMaterial({
   emissive: 0x222222,
   emissiveIntensity: 0.1,
   shininess: 5,
+});
+textureLoader.load('textures/moon.jpg', (tex) => {
+  moonMat.map = tex;
+  moonMat.color.set(0xffffff);
+  moonMat.emissive.set(0x000000);
+  moonMat.needsUpdate = true;
 });
 const moonMesh = new THREE.Mesh(moonGeo, moonMat);
 scene.add(moonMesh);
