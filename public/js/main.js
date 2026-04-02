@@ -169,21 +169,27 @@ textureLoader.load('textures/moon.jpg', (tex) => {
 const moonMesh = new THREE.Mesh(moonGeo, moonMat);
 scene.add(moonMesh);
 
-// --- Orion spacecraft marker ---
+// --- Orion spacecraft model ---
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const orionGroup = new THREE.Group();
-// Cone body
-const orionCone = new THREE.Mesh(
-  new THREE.ConeGeometry(0.8, 2.0, 8),
-  new THREE.MeshPhongMaterial({ color: 0xeeeeee, emissive: 0x445566, emissiveIntensity: 0.3 })
-);
-orionCone.rotation.x = Math.PI;
-orionGroup.add(orionCone);
-// Glow ring
+// Glow ring (visible at distance)
 const orionRing = new THREE.Mesh(
   new THREE.RingGeometry(1.2, 1.8, 32),
   new THREE.MeshBasicMaterial({ color: 0x55aaff, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
 );
 orionGroup.add(orionRing);
+// Load GLB model
+new GLTFLoader().load('models/orion.glb', (gltf) => {
+  const model = gltf.scene;
+  model.scale.setScalar(3);
+  model.traverse((child) => {
+    if (child.isMesh) {
+      child.material.emissive = new THREE.Color(0x334455);
+      child.material.emissiveIntensity = 0.3;
+    }
+  });
+  orionGroup.add(model);
+});
 scene.add(orionGroup);
 
 // --- Trajectory line ---
