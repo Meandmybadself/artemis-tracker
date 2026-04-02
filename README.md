@@ -9,6 +9,29 @@ In live mode, the viewer dead-reckons Orion's position and attitude between tele
 
 This is a derivative work of [Ian Dees' artemis-viewer](https://github.com/iandees/artemis-viewer).
 
+## How this was built
+
+The UI was rewritten using Claude Code with the following prompt:
+
+> Replace the 3D Three.js visualization in artemis-viewer with a retro 2D CRT-style display.
+>
+> AESTHETIC: Cassette futurism / retro CRT terminal
+> - Color: #00ff41 green on near-black (#020c02) background
+> - Phosphor glow: text-shadow and canvas shadowBlur in green
+> - CRT scanlines: CSS repeating-linear-gradient overlay (subtle, ~2px lines)
+> - Font: VT323 or Share Tech Mono from Google Fonts (monospace terminal look)
+> - Panel borders: CSS double borders or box-drawing chars (╔═╗║╚╝) in green
+> - ALL CAPS labels
+> - Glowing lines, interlacing effect
+>
+> WHAT THE 2D CANVAS SHOULD SHOW:
+> 1. Top-down orbital view: Earth as a small circle at center, Moon's orbital path as a dotted circle, Moon as a dot on its orbit, Orion's trajectory as a line, Orion as a blinking crosshair/dot
+> 2. Attitude reticle (small inset): shows Orion orientation using the quaternion data — a simple crosshair that rotates
+> 3. Grid overlay: faint green grid lines behind everything (like a radar screen)
+> 4. Scale indicator in corner
+>
+> Remove Three.js entirely. No more GLB model, no more OrbitControls, no more 3D camera. Keep all telemetry polling code, UI update code, event handlers and keyboard shortcuts. Replace the Three.js animate() loop with a simple 2D canvas redraw loop.
+
 ## Running
 
 ```bash
