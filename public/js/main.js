@@ -393,6 +393,15 @@ function updateScene() {
   moonMesh.position.copy(moonPos);
   orionGroup.position.copy(orionPos);
 
+  // Rotate Earth to match reality
+  // Greenwich Mean Sidereal Time: Earth's rotation angle relative to vernal equinox
+  // GMST at J2000.0 epoch (2000-01-01 12:00 UTC) = 280.46061837 degrees
+  // Earth rotates 360.98564736629 degrees per day (sidereal)
+  const J2000 = Date.UTC(2000, 0, 1, 12, 0, 0);
+  const daysSinceJ2000 = (currentTime.getTime() - J2000) / 86400000;
+  const gmstDeg = (280.46061837 + 360.98564736629 * daysSinceJ2000) % 360;
+  earthMesh.rotation.y = gmstDeg * Math.PI / 180;
+
   // Orient Orion cone along velocity vector
   if (usedLive && orionState.qw != null) {
     // Use actual spacecraft attitude quaternion from telemetry
