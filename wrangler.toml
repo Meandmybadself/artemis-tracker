@@ -1,4 +1,4 @@
-name = "artemis-viewer"
+name = "artemis-tracker"
 main = "src/worker.js"
 compatibility_date = "2024-12-01"
 
@@ -6,5 +6,5 @@ compatibility_date = "2024-12-01"
 directory = "public"
 
 [[routes]]
-pattern = "artemistracker.mapki.com"
+pattern = "artemis-tracker.meandmybadself.com"
 custom_domain = true

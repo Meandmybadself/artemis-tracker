@@ -3,266 +3,487 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Artemis II Trajectory Viewer</title>
+  <title>ARTEMIS II TRAJECTORY DISPLAY</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; color: #fff; font-family: 'Helvetica Neue', sans-serif; overflow: hidden; }
-    #canvas { display: block; width: 100vw; height: 100vh; }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-    #hud {
-      position: absolute; top: 0; left: 0; right: 0;
-      display: flex; justify-content: space-between; align-items: flex-start;
-      padding: 20px; pointer-events: none;
+    :root {
+      --green:       #00ff41;
+      --green-dim:   rgba(0, 255, 65, 0.55);
+      --green-muted: rgba(0, 255, 65, 0.3);
+      --green-faint: rgba(0, 255, 65, 0.12);
+      --bg:          #010801;
+      --bg-panel:    #020f02;
+      --border:      rgba(0, 255, 65, 0.28);
+      --glow-sm:     0 0 6px rgba(0, 255, 65, 0.5);
+      --glow-md:     0 0 10px rgba(0, 255, 65, 0.6), 0 0 20px rgba(0, 255, 65, 0.2);
+      --font-mono:   'Share Tech Mono', monospace;
+      --font-display:'VT323', monospace;
     }
-    #hud > * { pointer-events: auto; }
 
-    #info-panel {
-      background: rgba(10, 15, 30, 0.85);
-      border: 1px solid rgba(100, 140, 255, 0.3);
-      border-radius: 8px;
-      padding: 16px 20px;
-      min-width: 280px;
-      backdrop-filter: blur(10px);
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--green);
+      font-family: var(--font-mono);
     }
-    #info-panel h1 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #7eb8ff; }
-    .stat { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
-    .stat-label { color: #8899bb; }
-    .stat-value { color: #ddeeff; font-variant-numeric: tabular-nums; }
-    .section-header {
-      font-size: 11px; font-weight: 600; color: #5580aa; text-transform: uppercase;
-      letter-spacing: 0.5px; margin-top: 10px; padding-top: 8px;
-      border-top: 1px solid rgba(100,140,255,0.15); margin-bottom: 6px;
-      cursor: pointer; user-select: none;
-    }
-    .section-header:hover { color: #7eb8ff; }
-    .section-header::before { content: '\25B6 '; font-size: 8px; }
-    .section-header.open::before { content: '\25BC '; font-size: 8px; }
-    .section-body { display: none; }
-    .section-body.open { display: block; }
-    .telemetry-na { color: #445566; }
-    #about-link { font-size: 11px; color: #5580aa; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(100,140,255,0.15); }
-    #about-link a, #about-link button { color: #5580aa; text-decoration: none; background: none; border: none; cursor: pointer; font: inherit; padding: 0; }
-    #about-link a:hover, #about-link button:hover { color: #7eb8ff; text-decoration: underline; }
-    #info-panel { max-height: calc(100vh - 160px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(100,140,255,0.3) transparent; }
 
+    /* ── CRT overlay effects ─────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 9998;
+      background: radial-gradient(ellipse at 50% 50%,
+        transparent 55%, rgba(0,0,0,0.55) 100%);
+      pointer-events: none;
+    }
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 9999;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.13) 2px,
+        rgba(0, 0, 0, 0.13) 4px
+      );
+      pointer-events: none;
+    }
+
+    @keyframes screen-flicker {
+      0%,94%,100% { opacity: 1; }
+      95%          { opacity: 0.97; }
+      97%          { opacity: 0.95; }
+      98%          { opacity: 0.98; }
+    }
+
+    /* ── Terminal shell ──────────────────────────────────────── */
+    #terminal {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      animation: screen-flicker 12s infinite;
+    }
+
+    /* ── Header bar ──────────────────────────────────────────── */
+    #header-bar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0 12px;
+      height: 32px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-display);
+      font-size: 17px;
+      letter-spacing: 1px;
+      text-shadow: var(--glow-sm);
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    #header-title { color: var(--green); margin-right: 24px; }
+    #header-time  { flex: 1; color: var(--green); }
+    #header-met   { color: var(--green-dim); margin-right: 16px; }
+    #header-about {
+      background: none; border: 1px solid var(--border); color: var(--green-dim);
+      font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px;
+      padding: 2px 7px; cursor: pointer; text-transform: uppercase;
+      transition: all 0.15s;
+    }
+    #header-about:hover {
+      color: var(--green); border-color: var(--green); box-shadow: var(--glow-sm);
+    }
+
+    /* ── Main content ────────────────────────────────────────── */
+    #main-area {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    /* ── Orbital display (left) ──────────────────────────────── */
+    #orbital-section {
+      flex: 0 0 62%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+    .section-label {
+      flex-shrink: 0;
+      padding: 3px 10px;
+      font-family: var(--font-display);
+      font-size: 13px;
+      color: var(--green-dim);
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      letter-spacing: 1px;
+    }
+    #canvas {
+      flex: 1;
+      display: block;
+      min-height: 0;
+      width: 100%;
+    }
+
+    /* ── Data panels (right) ─────────────────────────────────── */
+    #data-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      min-width: 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .data-panel {
+      border-bottom: 1px solid var(--border);
+      padding: 7px 12px 8px;
+      background: var(--bg-panel);
+    }
+    .panel-hdr {
+      font-family: var(--font-display);
+      font-size: 14px;
+      color: var(--green-dim);
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 2px;
+      gap: 6px;
+    }
+    .lbl {
+      font-size: 10px;
+      color: var(--green-muted);
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .val {
+      font-family: var(--font-display);
+      font-size: 15px;
+      color: var(--green);
+      text-align: right;
+      text-shadow: var(--glow-sm);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .val.na { color: var(--green-muted); text-shadow: none; }
+    .val.live {
+      color: var(--green);
+      text-shadow: var(--glow-md);
+    }
+    #trajectory-note {
+      margin-top: 4px;
+      font-size: 10px;
+      color: rgba(0, 255, 65, 0.35);
+      line-height: 1.4;
+      letter-spacing: 0.3px;
+      display: none;
+    }
+
+    /* ── Controls bar ────────────────────────────────────────── */
     #controls-panel {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      background: rgba(10, 15, 30, 0.85);
-      border-top: 1px solid rgba(100, 140, 255, 0.2);
-      padding: 16px 24px;
-      backdrop-filter: blur(10px);
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
+      padding: 6px 12px 7px;
     }
-    #timeline-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-    #time-label { font-size: 13px; color: #7eb8ff; min-width: 200px; }
-    #met-label { font-size: 12px; color: #6688aa; }
+    #live-status-row {
+      font-size: 10px;
+      min-height: 14px;
+      margin-bottom: 3px;
+      color: var(--green-dim);
+      letter-spacing: 0.5px;
+    }
+    #timeline-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 5px;
+    }
     #timeline {
-      flex: 1; -webkit-appearance: none; appearance: none;
-      height: 4px; background: rgba(100, 140, 255, 0.2); border-radius: 2px; cursor: pointer;
+      flex: 1;
+      -webkit-appearance: none; appearance: none;
+      height: 3px;
+      background: rgba(0, 255, 65, 0.18);
+      cursor: pointer;
+      outline: none;
     }
     #timeline::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 14px; height: 14px;
-      background: #5599ff; border-radius: 50%; cursor: grab;
+      -webkit-appearance: none;
+      width: 11px; height: 11px;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      cursor: grab;
     }
-    #btn-row { display: flex; gap: 8px; align-items: center; }
+    #btn-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
     .btn {
-      background: rgba(80, 130, 255, 0.15); border: 1px solid rgba(100, 140, 255, 0.3);
-      color: #aaccff; border-radius: 4px; padding: 5px 14px; cursor: pointer; font-size: 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--green-dim);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: all 0.1s;
+      white-space: nowrap;
     }
-    .btn:hover { background: rgba(80, 130, 255, 0.3); }
-    .btn.active { background: rgba(80, 130, 255, 0.4); border-color: #5599ff; color: #fff; }
-    #speed-display { font-size: 12px; color: #6688aa; margin-left: 8px; }
-
-    #focus-btns { display: flex; gap: 6px; margin-left: auto; }
-
-    #loading {
-      position: absolute; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      background: #000; z-index: 100;
+    .btn:hover {
+      color: var(--green);
+      border-color: var(--green-muted);
+      background: var(--green-faint);
     }
-    #loading h2 { font-size: 18px; color: #7eb8ff; margin-bottom: 12px; }
-    #loading-status { font-size: 13px; color: #6688aa; }
-    .spinner {
-      width: 40px; height: 40px; border: 3px solid rgba(100, 140, 255, 0.2);
-      border-top-color: #5599ff; border-radius: 50%;
-      animation: spin 1s linear infinite; margin-bottom: 16px;
+    .btn.active {
+      color: var(--green);
+      border-color: var(--green);
+      background: rgba(0, 255, 65, 0.1);
+      box-shadow: var(--glow-sm);
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    #live-status-row { min-height: 18px; margin-bottom: 4px; }
-    #live-status { font-size: 12px; color: #ffaa44; }
-
-    .live-dot {
-      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-      background: #555; margin-right: 6px; vertical-align: middle;
+    #btn-live .live-dot {
+      display: inline-block;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green-muted);
+      margin-right: 5px;
+      vertical-align: middle;
     }
     #btn-live.active .live-dot {
-      background: #ff3333;
-      box-shadow: 0 0 6px #ff3333;
-      animation: pulse-dot 1.5s ease-in-out infinite;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: dot-pulse 1.4s ease-in-out infinite;
     }
-    #btn-live.active {
-      border-color: #ff4444; color: #ff6666; background: rgba(255, 50, 50, 0.15);
+    @keyframes dot-pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.25; }
     }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+    #speed-display {
+      font-size: 11px;
+      color: var(--green-muted);
+      margin-left: 3px;
+      min-width: 36px;
+      font-family: var(--font-display);
+      font-size: 14px;
     }
+    #focus-btns { display: flex; gap: 5px; margin-left: auto; }
 
-    #tooltip {
-      position: absolute; display: none;
-      background: rgba(10, 15, 30, 0.9); border: 1px solid rgba(100, 140, 255, 0.4);
-      border-radius: 6px; padding: 8px 12px; font-size: 12px;
-      pointer-events: none; z-index: 50;
+    /* ── Loading screen ──────────────────────────────────────── */
+    #loading {
+      position: fixed; inset: 0; z-index: 200;
+      background: var(--bg);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px;
     }
+    #loading-title {
+      font-family: var(--font-display);
+      font-size: 26px;
+      letter-spacing: 4px;
+      color: var(--green);
+      text-shadow: var(--glow-md);
+    }
+    #loading-status {
+      font-family: var(--font-display);
+      font-size: 16px;
+      color: var(--green-dim);
+      letter-spacing: 1px;
+    }
+    @keyframes cursor-blink {
+      0%,100% { opacity: 1; } 50% { opacity: 0; }
+    }
+    #loading-cursor { animation: cursor-blink 0.8s step-end infinite; }
 
-    #shortcuts-modal {
-      display: none; position: fixed; inset: 0; z-index: 200;
-      background: rgba(0, 0, 0, 0.7); align-items: center; justify-content: center;
+    /* ── Modals ──────────────────────────────────────────────── */
+    .modal {
+      display: none;
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(0, 0, 0, 0.82);
+      align-items: center; justify-content: center;
     }
-    #shortcuts-modal.open { display: flex; }
-    #shortcuts-content {
-      background: rgba(10, 15, 30, 0.95); border: 1px solid rgba(100, 140, 255, 0.3);
-      border-radius: 10px; padding: 24px 32px; backdrop-filter: blur(10px);
-      max-width: 400px; width: 90%;
+    .modal.open { display: flex; }
+    .modal-box {
+      background: #010f01;
+      border: 1px solid var(--border);
+      box-shadow: 0 0 30px rgba(0,255,65,0.12);
+      padding: 22px 28px;
+      max-width: 420px; width: 90%;
+      font-family: var(--font-mono);
+      font-size: 12px;
     }
-    #shortcuts-content h2 { font-size: 15px; color: #7eb8ff; margin-bottom: 16px; }
-    .shortcut-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+    .modal-box h2 {
+      font-family: var(--font-display);
+      font-size: 22px;
+      color: var(--green);
+      text-shadow: var(--glow-sm);
+      letter-spacing: 2px;
+      margin-bottom: 14px;
+    }
+    .modal-box p {
+      color: var(--green-dim);
+      line-height: 1.55;
+      margin-bottom: 9px;
+    }
+    .modal-box a { color: var(--green); text-decoration: none; }
+    .modal-box a:hover { text-decoration: underline; }
+    .shortcut-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+    }
+    .shortcut-desc { font-size: 12px; color: var(--green-dim); }
     .shortcut-key {
-      background: rgba(80, 130, 255, 0.15); border: 1px solid rgba(100, 140, 255, 0.3);
-      border-radius: 4px; padding: 2px 8px; font-family: monospace; color: #aaccff; font-size: 12px;
+      background: rgba(0,255,65,0.08);
+      border: 1px solid var(--border);
+      color: var(--green);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 8px;
     }
-    .shortcut-desc { color: #8899bb; }
-
-    #about-modal {
-      display: none; position: fixed; inset: 0; z-index: 200;
-      background: rgba(0, 0, 0, 0.7); align-items: center; justify-content: center;
-    }
-    #about-modal.open { display: flex; }
-    #about-content {
-      background: rgba(10, 15, 30, 0.95); border: 1px solid rgba(100, 140, 255, 0.3);
-      border-radius: 10px; padding: 24px 32px; backdrop-filter: blur(10px);
-      max-width: 440px; width: 90%; font-size: 13px; line-height: 1.6; color: #8899bb;
-    }
-    #about-content h2 { font-size: 15px; color: #7eb8ff; margin-bottom: 12px; }
-    #about-content a { color: #5599ff; text-decoration: none; }
-    #about-content a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
 
+  <!-- Loading screen -->
   <div id="loading">
-    <div class="spinner"></div>
-    <h2>Artemis II Trajectory Viewer</h2>
-    <div id="loading-status">Fetching trajectory data from JPL Horizons...</div>
+    <div id="loading-title">▓ ARTEMIS II ▓</div>
+    <div id="loading-status">INITIALIZING<span id="loading-cursor">_</span></div>
   </div>
 
-  <div id="hud">
-    <div id="info-panel">
-      <h1>ARTEMIS II &mdash; ORION</h1>
-      <div class="stat"><span class="stat-label">Distance from Earth</span><span class="stat-value" id="dist-earth">&mdash;</span></div>
-      <div class="stat"><span class="stat-label">Distance from Moon</span><span class="stat-value" id="dist-moon">&mdash;</span></div>
-      <div class="stat"><span class="stat-label">Velocity</span><span class="stat-value" id="velocity">&mdash;</span></div>
-      <div class="stat"><span class="stat-label">Altitude (Earth)</span><span class="stat-value" id="altitude">&mdash;</span></div>
-      <div class="stat" style="margin-top:8px; border-top: 1px solid rgba(100,140,255,0.15); padding-top:8px">
-        <span class="stat-label">Data source</span><span class="stat-value" id="data-source">Horizons ephemeris</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Last update</span><span class="stat-value" id="data-age"></span>
-      </div>
-      <div id="trajectory-note" style="font-size:11px; color:#6688aa; margin-top:8px; padding-top:8px; border-top:1px solid rgba(100,140,255,0.15); line-height:1.4; display:none">
-        Trajectory line is a pre-launch<br>prediction from JPL Horizons<br>and may differ from actual position.
+  <!-- Terminal -->
+  <div id="terminal">
+
+    <!-- Header -->
+    <div id="header-bar">
+      <span id="header-title">╔══ ARTEMIS II / ORION ══╗</span>
+      <span id="time-label" style="flex:1; overflow:hidden; text-overflow:ellipsis;">──</span>
+      <span id="met-label" style="margin-right:20px;">MET: ──</span>
+      <button id="header-about">ABOUT</button>
+    </div>
+
+    <!-- Main -->
+    <div id="main-area">
+
+      <!-- Left: orbital canvas -->
+      <div id="orbital-section">
+        <div class="section-label">╠══ ORBITAL DISPLAY ══════════════╣</div>
+        <canvas id="canvas"></canvas>
       </div>
 
-      <div class="section-header" id="toggle-telemetry">Raw Telemetry</div>
-      <div class="section-body" id="section-telemetry">
-        <div class="stat"><span class="stat-label">Quaternion (w)</span><span class="stat-value telemetry-na" id="att-qw">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Quaternion (x)</span><span class="stat-value telemetry-na" id="att-qx">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Quaternion (y)</span><span class="stat-value telemetry-na" id="att-qy">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Quaternion (z)</span><span class="stat-value telemetry-na" id="att-qz">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Roll rate (deg/s)</span><span class="stat-value telemetry-na" id="rate-roll">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Pitch rate (deg/s)</span><span class="stat-value telemetry-na" id="rate-pitch">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Yaw rate (deg/s)</span><span class="stat-value telemetry-na" id="rate-yaw">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Thruster 1</span><span class="stat-value telemetry-na" id="thr-1">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Thruster 2</span><span class="stat-value telemetry-na" id="thr-2">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Thruster 3</span><span class="stat-value telemetry-na" id="thr-3">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">RCS 1</span><span class="stat-value telemetry-na" id="rcs-1">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">RCS 2</span><span class="stat-value telemetry-na" id="rcs-2">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">RCS 3</span><span class="stat-value telemetry-na" id="rcs-3">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">RCS 4</span><span class="stat-value telemetry-na" id="rcs-4">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">RCS 5</span><span class="stat-value telemetry-na" id="rcs-5">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Solar 2048</span><span class="stat-value telemetry-na" id="solar-2048">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Solar 2049</span><span class="stat-value telemetry-na" id="solar-2049">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Solar 2050</span><span class="stat-value telemetry-na" id="solar-2050">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Solar 2051</span><span class="stat-value telemetry-na" id="solar-2051">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Solar 2052</span><span class="stat-value telemetry-na" id="solar-2052">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Solar 2053</span><span class="stat-value telemetry-na" id="solar-2053">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Status flag</span><span class="stat-value telemetry-na" id="status-flag">&mdash;</span></div>
-        <div class="stat"><span class="stat-label">Altitude (telem)</span><span class="stat-value telemetry-na" id="telem-alt">&mdash;</span></div>
+      <!-- Right: data panels -->
+      <div id="data-section">
+
+        <div class="data-panel">
+          <div class="panel-hdr">╔═ NAVIGATION ═╗</div>
+          <div class="stat-row"><span class="lbl">DIST / EARTH</span><span class="val" id="dist-earth">——</span></div>
+          <div class="stat-row"><span class="lbl">DIST / MOON</span><span class="val" id="dist-moon">——</span></div>
+          <div class="stat-row"><span class="lbl">VELOCITY</span><span class="val" id="velocity">——</span></div>
+          <div class="stat-row"><span class="lbl">ALTITUDE</span><span class="val" id="altitude">——</span></div>
+        </div>
+
+        <div class="data-panel">
+          <div class="panel-hdr">╔═ DATALINK ═╗</div>
+          <div class="stat-row"><span class="lbl">SOURCE</span><span class="val" id="data-source">HORIZONS</span></div>
+          <div class="stat-row"><span class="lbl">LAST UPDATE</span><span class="val" id="data-age">——</span></div>
+          <div id="trajectory-note">
+            ⚠ TRAJECTORY: PRE-LAUNCH PREDICTION<br>SOURCE: JPL HORIZONS
+          </div>
+        </div>
+
+        <div class="data-panel">
+          <div class="panel-hdr">╔═ ATTITUDE ═╗</div>
+          <div class="stat-row"><span class="lbl">QUAT W</span><span class="val na" id="att-qw">——</span></div>
+          <div class="stat-row"><span class="lbl">QUAT X</span><span class="val na" id="att-qx">——</span></div>
+          <div class="stat-row"><span class="lbl">QUAT Y</span><span class="val na" id="att-qy">——</span></div>
+          <div class="stat-row"><span class="lbl">QUAT Z</span><span class="val na" id="att-qz">——</span></div>
+          <div class="stat-row"><span class="lbl">ROLL RATE</span><span class="val na" id="rate-roll">——</span></div>
+          <div class="stat-row"><span class="lbl">PITCH RATE</span><span class="val na" id="rate-pitch">——</span></div>
+          <div class="stat-row"><span class="lbl">YAW RATE</span><span class="val na" id="rate-yaw">——</span></div>
+        </div>
+
+        <div class="data-panel">
+          <div class="panel-hdr">╔═ PROPULSION ═╗</div>
+          <div class="stat-row"><span class="lbl">THRUSTER 1</span><span class="val na" id="thr-1">——</span></div>
+          <div class="stat-row"><span class="lbl">THRUSTER 2</span><span class="val na" id="thr-2">——</span></div>
+          <div class="stat-row"><span class="lbl">THRUSTER 3</span><span class="val na" id="thr-3">——</span></div>
+          <div class="stat-row"><span class="lbl">RCS 1</span><span class="val na" id="rcs-1">——</span></div>
+          <div class="stat-row"><span class="lbl">RCS 2</span><span class="val na" id="rcs-2">——</span></div>
+          <div class="stat-row"><span class="lbl">RCS 3</span><span class="val na" id="rcs-3">——</span></div>
+          <div class="stat-row"><span class="lbl">RCS 4</span><span class="val na" id="rcs-4">——</span></div>
+          <div class="stat-row"><span class="lbl">RCS 5</span><span class="val na" id="rcs-5">——</span></div>
+        </div>
+
+        <div class="data-panel">
+          <div class="panel-hdr">╔═ SOLAR ARRAYS ═╗</div>
+          <div class="stat-row"><span class="lbl">SAW 2048</span><span class="val na" id="solar-2048">——</span></div>
+          <div class="stat-row"><span class="lbl">SAW 2049</span><span class="val na" id="solar-2049">——</span></div>
+          <div class="stat-row"><span class="lbl">SAW 2050</span><span class="val na" id="solar-2050">——</span></div>
+          <div class="stat-row"><span class="lbl">SAW 2051</span><span class="val na" id="solar-2051">——</span></div>
+          <div class="stat-row"><span class="lbl">SAW 2052</span><span class="val na" id="solar-2052">——</span></div>
+          <div class="stat-row"><span class="lbl">SAW 2053</span><span class="val na" id="solar-2053">——</span></div>
+          <div class="stat-row"><span class="lbl">STATUS FLAG</span><span class="val na" id="status-flag">——</span></div>
+          <div class="stat-row"><span class="lbl">ALT (TELEM)</span><span class="val na" id="telem-alt">——</span></div>
+        </div>
+
+      </div><!-- /data-section -->
+    </div><!-- /main-area -->
+
+    <!-- Controls -->
+    <div id="controls-panel">
+      <div id="live-status-row"><span id="live-status"></span></div>
+      <div id="timeline-row">
+        <input type="range" id="timeline" min="0" max="1000" value="0">
       </div>
-      <div id="about-link"><button id="btn-about">About this project</button> &middot; <span class="shortcut-key" style="font-size:10px; cursor:pointer" onclick="document.getElementById('shortcuts-modal').classList.add('open')">?</span></div>
+      <div id="btn-row">
+        <button class="btn" id="btn-live"><span class="live-dot"></span>LIVE</button>
+        <button class="btn" id="btn-play">&#9654; PLAY</button>
+        <button class="btn" id="btn-slower">&laquo;</button>
+        <button class="btn" id="btn-faster">&raquo;</button>
+        <span id="speed-display">1X</span>
+      </div>
+    </div>
+
+  </div><!-- /terminal -->
+
+  <!-- About modal -->
+  <div id="about-modal" class="modal">
+    <div class="modal-box">
+      <h2>ARTEMIS II TRACKER</h2>
+      <p>Real-time trajectory display for NASA's Artemis II mission — the first crewed flight to the Moon in over 50 years.</p>
+      <p>Orion's position is tracked using live telemetry from NASA's <a href="https://www.nasa.gov/missions/artemis-ii/arow/" target="_blank">AROW</a> system. The predicted trajectory comes from <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank">JPL Horizons</a>.</p>
+      <p>Press <span class="shortcut-key">?</span> for keyboard shortcuts.</p>
+      <p style="margin-top:6px"><a href="https://github.com/iandees/artemis-viewer" target="_blank">VIEW SOURCE ON GITHUB</a></p>
     </div>
   </div>
 
-  <div id="controls-panel">
-    <div id="live-status-row"><span id="live-status"></span></div>
-    <div id="timeline-row">
-      <span id="time-label">--</span>
-      <input type="range" id="timeline" min="0" max="1000" value="0">
-      <span id="met-label">MET: --</span>
-    </div>
-    <div id="btn-row">
-      <button class="btn" id="btn-live"><span class="live-dot"></span>LIVE</button>
-      <button class="btn" id="btn-play">&#9654; Play</button>
-      <button class="btn" id="btn-slower">&laquo;</button>
-      <button class="btn" id="btn-faster">&raquo;</button>
-      <span id="speed-display">1x</span>
-      <div id="focus-btns">
-        <button class="btn" id="focus-earth">Earth</button>
-        <button class="btn active" id="focus-orion">Orion</button>
-        <button class="btn" id="focus-moon">Moon</button>
-        <button class="btn" id="focus-free">Free</button>
-      </div>
+  <!-- Shortcuts modal -->
+  <div id="shortcuts-modal" class="modal">
+    <div class="modal-box">
+      <h2>KEYBOARD SHORTCUTS</h2>
+      <div class="shortcut-row"><span class="shortcut-desc">PLAY / PAUSE</span><span class="shortcut-key">SPACE</span></div>
+      <div class="shortcut-row"><span class="shortcut-desc">TOGGLE LIVE MODE</span><span class="shortcut-key">L</span></div>
+      <div class="shortcut-row"><span class="shortcut-desc">SLOWER PLAYBACK</span><span class="shortcut-key">&#8592;</span></div>
+      <div class="shortcut-row"><span class="shortcut-desc">FASTER PLAYBACK</span><span class="shortcut-key">&#8594;</span></div>
+<div class="shortcut-row"><span class="shortcut-desc">TOGGLE IMPERIAL / METRIC</span><span class="shortcut-key">U</span></div>
+      <div class="shortcut-row"><span class="shortcut-desc">TOGGLE LOCAL / UTC TIME</span><span class="shortcut-key">T</span></div>
+      <div class="shortcut-row"><span class="shortcut-desc">THIS HELP</span><span class="shortcut-key">?</span></div>
     </div>
   </div>
 
-  <div id="tooltip"></div>
-
-  <div id="about-modal">
-    <div id="about-content">
-      <h2>Artemis II Trajectory Viewer</h2>
-      <p>A real-time 3D visualization of NASA's Artemis II mission, the first crewed flight to the Moon in over 50 years.</p>
-      <p style="margin-top:10px">Orion's position is tracked using live telemetry from NASA's <a href="https://www.nasa.gov/missions/artemis-ii/arow/" target="_blank">AROW</a> system. The predicted trajectory comes from <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank">JPL Horizons</a> ephemeris data. Stars are from the <a href="https://github.com/astronexus/HYG-Database" target="_blank">HYG catalog</a>.</p>
-      <p style="margin-top:10px">Press <span class="shortcut-key">?</span> for keyboard shortcuts.</p>
-      <p style="margin-top:14px"><a href="https://github.com/iandees/artemis-viewer" target="_blank">View source on GitHub</a></p>
-    </div>
-  </div>
-
-  <div id="shortcuts-modal">
-    <div id="shortcuts-content">
-      <h2>Keyboard Shortcuts</h2>
-      <div class="shortcut-row"><span class="shortcut-desc">Play / Pause</span><span class="shortcut-key">Space</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Toggle live mode</span><span class="shortcut-key">L</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Slower playback</span><span class="shortcut-key">&larr;</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Faster playback</span><span class="shortcut-key">&rarr;</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Focus Earth</span><span class="shortcut-key">1</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Focus Orion</span><span class="shortcut-key">2</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Focus Moon</span><span class="shortcut-key">3</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Free camera</span><span class="shortcut-key">4</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Toggle imperial / metric</span><span class="shortcut-key">U</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Toggle local / UTC time</span><span class="shortcut-key">T</span></div>
-      <div class="shortcut-row"><span class="shortcut-desc">Show this help</span><span class="shortcut-key">?</span></div>
-    </div>
-  </div>
-
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://esm.sh/three@0.171.0",
-        "three/addons/": "https://esm.sh/three@0.171.0/examples/jsm/"
-      }
-    }
-  </script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
