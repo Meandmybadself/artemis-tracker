@@ -1,4 +1,5 @@
 name = "artemis-tracker"
+account_id = "c3b373ae8a90a6494e520f962bdf462b"
 main = "src/worker.js"
 compatibility_date = "2024-12-01"
 
