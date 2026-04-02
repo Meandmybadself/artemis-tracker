@@ -96,13 +96,13 @@
     #header-title { color: var(--green); margin-right: 24px; }
     #header-time  { flex: 1; color: var(--green); }
     #header-met   { color: var(--green-dim); margin-right: 16px; }
-    #header-3d, #header-about {
+    #header-3d, #header-fs, #header-about {
       background: none; border: 1px solid var(--border); color: var(--green-dim);
       font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px;
       padding: 2px 7px; cursor: pointer; text-transform: uppercase;
       transition: all 0.15s; text-decoration: none; margin-right: 6px;
     }
-    #header-3d:hover, #header-about:hover {
+    #header-3d:hover, #header-fs:hover, #header-about:hover {
       color: var(--green); border-color: var(--green); box-shadow: var(--glow-sm);
     }
 
@@ -382,6 +382,7 @@
       <span id="time-label" style="flex:1; overflow:hidden; text-overflow:ellipsis;">──</span>
       <span id="met-label" style="margin-right:20px;">MET: ──</span>
       <a href="https://artemistracker.mapki.com/" target="_blank" id="header-3d">3D VIEW</a>
+      <button id="header-fs">⛶ FULLSCREEN</button>
       <button id="header-about">ABOUT</button>
     </div>
 

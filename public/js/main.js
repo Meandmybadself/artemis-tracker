@@ -911,5 +911,17 @@ document.getElementById('header-about').addEventListener('click', () => {
   document.getElementById('about-modal').classList.add('open');
 });
 
+const btnFs = document.getElementById('header-fs');
+btnFs.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+});
+document.addEventListener('fullscreenchange', () => {
+  btnFs.textContent = document.fullscreenElement ? '⛶ EXIT' : '⛶ FULLSCREEN';
+});
+
 updateSpeedDisplay();
 init();
