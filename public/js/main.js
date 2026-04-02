@@ -143,6 +143,30 @@ scene.add(moonLabel);
 const orionLabel = makeLabel('Orion', '#ffaa44');
 scene.add(orionLabel);
 
+// --- Sun (placed in correct direction, visual distance) ---
+const SUN_VISUAL_DIST = 5000; // units — near starfield, not to scale
+const sunSprite = (() => {
+  const cvs = document.createElement('canvas');
+  cvs.width = 128; cvs.height = 128;
+  const ctx = cvs.getContext('2d');
+  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255, 255, 220, 1)');
+  grad.addColorStop(0.15, 'rgba(255, 230, 140, 0.9)');
+  grad.addColorStop(0.4, 'rgba(255, 200, 60, 0.3)');
+  grad.addColorStop(1, 'rgba(255, 180, 40, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(cvs);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(300, 300, 1);
+  return sprite;
+})();
+scene.add(sunSprite);
+
+const sunLabel = makeLabel('Sun', '#ffdd66');
+scene.add(sunLabel);
+
 // --- State ---
 let data = null;
 let currentTime = null;
@@ -332,6 +356,7 @@ function updateScene() {
     orionState = interpolate(data.orion, currentTime);
   }
   const moonState = interpolate(data.moon, currentTime);
+  const sunState = interpolate(data.sun, currentTime);
 
   // NASA telemetry is Earth-centered J2000 equatorial (X,Y,Z in km after our conversion)
   // Horizons data is ecliptic J2000. For the Moon we always use ecliptic.
@@ -359,6 +384,13 @@ function updateScene() {
     const quat = new THREE.Quaternion().setFromUnitVectors(up, velDir);
     orionGroup.quaternion.copy(quat);
   }
+
+  // Sun direction (placed at visual distance, not to scale)
+  const sunDir = toScene(sunState).normalize();
+  const sunPos = sunDir.clone().multiplyScalar(SUN_VISUAL_DIST);
+  sunSprite.position.copy(sunPos);
+  sunLabel.position.copy(sunDir.clone().multiplyScalar(SUN_VISUAL_DIST * 0.95)).add(new THREE.Vector3(0, 40, 0));
+  sunLight.position.copy(sunDir.clone().multiplyScalar(500));
 
   // Labels follow objects
   moonLabel.position.copy(moonPos).add(new THREE.Vector3(0, MOON_RADIUS + 5, 0));

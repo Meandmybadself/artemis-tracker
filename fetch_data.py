@@ -17,6 +17,7 @@ STEP = '10 min'
 TARGETS = {
     'orion': '-1024',
     'moon': '301',
+    'sun': '10',
 }
 
 def fetch(command, center='500@399'):

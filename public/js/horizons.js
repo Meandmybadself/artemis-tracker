@@ -26,8 +26,11 @@ export async function fetchTrajectoryData(onStatus) {
   onStatus('Loading Moon ephemeris...');
   const moon = await loadJson('moon');
 
+  onStatus('Loading Sun ephemeris...');
+  const sun = await loadJson('sun');
+
   onStatus('Data loaded. Building scene...');
-  return { orion, moon };
+  return { orion, moon, sun };
 }
 
 // Interpolate position at a given time from sorted data points
