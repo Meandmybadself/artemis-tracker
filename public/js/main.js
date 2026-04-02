@@ -210,9 +210,13 @@ async function pollTelemetry() {
     if (telData.orion && telData.orion.File && telData.orion.File.Activity === 'MIS') {
       const parsed = parseTelemetry(telData.orion);
       if (parsed) {
-        prevLiveTelemetry = liveTelemetry;
-        liveTelemetry = parsed;
-        liveTelemetryTime = performance.now();
+        // Only update if NASA's data timestamp has actually changed
+        const isNew = !liveTelemetry || parsed.date.getTime() !== liveTelemetry.date.getTime();
+        if (isNew) {
+          prevLiveTelemetry = liveTelemetry;
+          liveTelemetry = parsed;
+          liveTelemetryTime = performance.now();
+        }
       }
     }
   } catch (e) {
@@ -488,6 +492,7 @@ function setLiveMode(on) {
     elBtnLive.classList.add('active');
     speedMultiplier = 1;
     speedIdx = 0;
+    lastTelemetryFetch = 0; // fetch immediately on entering live mode
     updateSpeedDisplay();
     updateLiveTime();
   } else {
