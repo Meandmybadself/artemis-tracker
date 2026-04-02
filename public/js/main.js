@@ -363,16 +363,10 @@ function updateScene() {
   const moonState = interpolate(data.moon, currentTime);
   const sunState = interpolate(data.sun, currentTime);
 
-  // NASA telemetry is Earth-centered J2000 equatorial (X,Y,Z in km after our conversion)
-  // Horizons data is ecliptic J2000. For the Moon we always use ecliptic.
-  // For Orion in live mode, the telemetry coords need equatorial->ecliptic conversion.
-  // Ecliptic obliquity ~23.4393 degrees
-  let orionPos;
-  if (usedLive) {
-    orionPos = equatorialToScene(orionState);
-  } else {
-    orionPos = toScene(orionState);
-  }
+  // Both Horizons data and NASA telemetry appear to be in the same Earth-centered
+  // frame (Horizons defaults to equatorial for geocentric vectors), so use the
+  // same toScene mapping for both.
+  const orionPos = toScene(orionState);
   const moonPos = toScene(moonState);
 
   // Update object positions
@@ -416,31 +410,22 @@ function updateScene() {
     controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
   }
 
-  // Update HUD — for live telemetry, compute distances in the original frame
-  let distEarthKm, distMoonKm, speed, altitudeKm;
-  if (usedLive) {
-    // Live telemetry is equatorial; Moon data is ecliptic. Compute Earth dist directly.
-    distEarthKm = Math.sqrt(orionState.x ** 2 + orionState.y ** 2 + orionState.z ** 2);
-    // For Moon distance, use scene positions (already converted)
-    distMoonKm = orionPos.distanceTo(moonPos) / SCALE;
-    speed = Math.sqrt(orionState.vx ** 2 + orionState.vy ** 2 + orionState.vz ** 2);
-    altitudeKm = orionState.altitude != null ? orionState.altitude : (distEarthKm - 6371);
-  } else {
-    distEarthKm = Math.sqrt(orionState.x ** 2 + orionState.y ** 2 + orionState.z ** 2);
-    distMoonKm = Math.sqrt(
-      (orionState.x - moonState.x) ** 2 +
-      (orionState.y - moonState.y) ** 2 +
-      (orionState.z - moonState.z) ** 2
-    );
-    speed = Math.sqrt(orionState.vx ** 2 + orionState.vy ** 2 + orionState.vz ** 2);
-    altitudeKm = distEarthKm - 6371;
-  }
+  // Update HUD
+  const distEarthKm = Math.sqrt(orionState.x ** 2 + orionState.y ** 2 + orionState.z ** 2);
+  const distMoonKm = Math.sqrt(
+    (orionState.x - moonState.x) ** 2 +
+    (orionState.y - moonState.y) ** 2 +
+    (orionState.z - moonState.z) ** 2
+  );
+  const speed = Math.sqrt(orionState.vx ** 2 + orionState.vy ** 2 + orionState.vz ** 2);
+  const altitudeKm = (usedLive && orionState.altitude != null) ? orionState.altitude : (distEarthKm - 6371);
 
   elDistEarth.textContent = formatDist(distEarthKm);
   elDistMoon.textContent = formatDist(distMoonKm);
   elVelocity.textContent = `${(speed).toFixed(2)} km/s (${(speed * 3600).toFixed(0)} km/h)`;
   elAltitude.textContent = formatDist(altitudeKm);
   elDataSource.textContent = usedLive ? 'NASA AROW (live)' : 'JPL Horizons';
+  document.getElementById('trajectory-note').style.display = usedLive ? 'block' : 'none';
   elDataSource.style.color = usedLive ? '#44ff88' : '#ddeeff';
   if (usedLive && liveTelemetry?.date) {
     const ageSec = Math.round((Date.now() - liveTelemetry.date.getTime()) / 1000);
@@ -493,7 +478,7 @@ function setLiveMode(on) {
     elBtnLive.classList.add('active');
     speedMultiplier = 1;
     speedIdx = 0;
-    lastTelemetryFetch = 0; // fetch immediately on entering live mode
+    lastTelemetryFetch = -Infinity; // fetch immediately on entering live mode
     updateSpeedDisplay();
     updateLiveTime();
   } else {
