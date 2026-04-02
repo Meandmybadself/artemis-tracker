@@ -197,6 +197,7 @@ let lastTelemetryFetch = -Infinity;
 let speedMultiplier = 60; // 1 real second = 60 mission seconds
 const speedSteps = [1, 10, 30, 60, 120, 300, 600, 1800, 3600];
 let speedIdx = 3;
+let useImperial = false; // toggle with 'u' key
 let focusTarget = 'orion'; // 'earth', 'moon', 'orion', 'free'
 let lastRealTime = null;
 
@@ -245,11 +246,14 @@ function parseTelemetry(raw) {
     const param = raw[`Parameter_${num}`];
     return param ? parseFloat(param.Value) : null;
   };
-  // Positions in meters from Earth center, convert to km
-  const x = p(2003); const y = p(2004); const z = p(2005);
-  if (x == null || y == null || z == null) return null;
-  // Velocities in m/s, convert to km/s
-  const vx = p(2009); const vy = p(2010); const vz = p(2011);
+  // Positions in feet from Earth center, convert to km
+  const FT_TO_KM = 0.0003048;
+  const xRaw = p(2003); const yRaw = p(2004); const zRaw = p(2005);
+  if (xRaw == null || yRaw == null || zRaw == null) return null;
+  const x = xRaw * FT_TO_KM; const y = yRaw * FT_TO_KM; const z = zRaw * FT_TO_KM;
+  // Velocities in ft/s, convert to km/s
+  const vxRaw = p(2009); const vyRaw = p(2010); const vzRaw = p(2011);
+  const vx = vxRaw * FT_TO_KM; const vy = vyRaw * FT_TO_KM; const vz = vzRaw * FT_TO_KM;
   // Attitude quaternion
   const qw = p(2012); const qx = p(2013); const qy = p(2014); const qz = p(2015);
   // Parse timestamp from parameter time field "2026:091:23:45:04.722"
@@ -264,8 +268,8 @@ function parseTelemetry(raw) {
   }
   return {
     date,
-    x: x / 1000, y: y / 1000, z: z / 1000,       // meters -> km
-    vx: vx / 1000, vy: vy / 1000, vz: vz / 1000,  // m/s -> km/s
+    x, y, z,       // km
+    vx, vy, vz,   // km/s
     qw, qx, qy, qz,
     // Angular rates (deg/s)
     rateRoll: p(2101), ratePitch: p(2102), rateYaw: p(2103),
@@ -447,7 +451,7 @@ function updateScene() {
 
   elDistEarth.textContent = formatDist(distEarthKm);
   elDistMoon.textContent = formatDist(distMoonKm);
-  elVelocity.textContent = `${(speed).toFixed(2)} km/s (${(speed * 3600).toFixed(0)} km/h)`;
+  elVelocity.textContent = formatSpeed(speed);
   elAltitude.textContent = formatDist(altitudeKm);
   elDataSource.textContent = usedLive ? 'NASA AROW (live)' : 'JPL Horizons';
   document.getElementById('trajectory-note').style.display = usedLive ? 'block' : 'none';
@@ -476,8 +480,21 @@ function updateScene() {
 }
 
 function formatDist(km) {
+  if (useImperial) {
+    const mi = km * 0.621371;
+    if (mi >= 1000) return `${mi.toLocaleString('en-US', { maximumFractionDigits: 0 })} mi`;
+    return `${mi.toFixed(1)} mi`;
+  }
   if (km >= 1000) return `${km.toLocaleString('en-US', { maximumFractionDigits: 0 })} km`;
   return `${km.toFixed(1)} km`;
+}
+
+function formatSpeed(kmPerSec) {
+  if (useImperial) {
+    const mph = kmPerSec * 2236.936;
+    return `${mph.toLocaleString('en-US', { maximumFractionDigits: 0 })} mph`;
+  }
+  return `${kmPerSec.toFixed(2)} km/s (${(kmPerSec * 3600).toLocaleString('en-US', { maximumFractionDigits: 0 })} km/h)`;
 }
 
 function formatMET(ms) {
@@ -584,13 +601,13 @@ document.getElementById('btn-slower').addEventListener('click', () => {
   updateSpeedDisplay();
 });
 
-function formatSpeed() {
+function formatPlaybackSpeed() {
   if (speedMultiplier >= 3600) return `${speedMultiplier / 3600}h/s`;
   if (speedMultiplier >= 60) return `${speedMultiplier / 60}m/s`;
   return `${speedMultiplier}x`;
 }
 function updateSpeedDisplay() {
-  elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatSpeed();
+  elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatPlaybackSpeed();
 }
 updateSpeedDisplay();
 
@@ -626,6 +643,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '3') document.getElementById('focus-moon').click();
   if (e.key === '4') document.getElementById('focus-free').click();
   if (e.key === 'l' || e.key === 'L') document.getElementById('btn-live').click();
+  if (e.key === 'u' || e.key === 'U') useImperial = !useImperial;
 });
 
 // --- Collapsible telemetry section ---
