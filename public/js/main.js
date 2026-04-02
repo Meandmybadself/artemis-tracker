@@ -181,11 +181,22 @@ orionGroup.add(orionRing);
 // Load GLB model
 new GLTFLoader().load('models/orion.glb', (gltf) => {
   const model = gltf.scene;
-  model.scale.setScalar(3);
+  model.scale.setScalar(0.02);
+  // Align model with telemetry body frame
+  // Model: -Z = heat shield/nose, +Z = service module, X/Y = solar arrays
+  // Orion body frame: -X = nose direction. Rotate model -Z → -X (-90° around Y)
+  model.rotation.y = -Math.PI / 2;
   model.traverse((child) => {
     if (child.isMesh) {
-      child.material.emissive = new THREE.Color(0x334455);
-      child.material.emissiveIntensity = 0.3;
+      const oldColor = child.material.color ? child.material.color.clone() : new THREE.Color(0xcccccc);
+      child.material = new THREE.MeshPhongMaterial({
+        vertexColors: !!child.geometry.attributes.color,
+        color: oldColor,
+        emissive: 0x334455,
+        emissiveIntensity: 0.3,
+        shininess: 20,
+        side: THREE.DoubleSide,
+      });
     }
   });
   orionGroup.add(model);
@@ -417,19 +428,44 @@ function equatorialToScene(p) {
   return new THREE.Vector3(ex * SCALE, ez * SCALE, -ey * SCALE);
 }
 
-// Extrapolate live telemetry position using velocity for smooth inter-sample motion
+// Extrapolate live telemetry using velocity (position) and angular rates (attitude)
+const _quatA = new THREE.Quaternion();
+const _quatB = new THREE.Quaternion();
+const _quatDelta = new THREE.Quaternion();
+
 function getLiveState() {
   if (!liveTelemetry) return null;
   const t = liveTelemetry;
   const dtSec = (performance.now() - liveTelemetryTime) / 1000;
+
+  // Dead-reckon position
   const vx = t.vx || 0, vy = t.vy || 0, vz = t.vz || 0;
   const x = t.x + vx * dtSec;
   const y = t.y + vy * dtSec;
   const z = t.z + vz * dtSec;
   const r = Math.sqrt(x * x + y * y + z * z);
+
+  // Dead-reckon quaternion using angular rates (deg/s -> rad/s)
+  let qw = t.qw, qx = t.qx, qy = t.qy, qz = t.qz;
+  if (qw != null && t.rateRoll != null) {
+    const wx = (t.rateRoll || 0) * Math.PI / 180;
+    const wy = (t.ratePitch || 0) * Math.PI / 180;
+    const wz = (t.rateYaw || 0) * Math.PI / 180;
+    const halfAngle = 0.5 * Math.sqrt(wx * wx + wy * wy + wz * wz) * dtSec;
+    if (halfAngle > 1e-8) {
+      const axis = Math.sin(halfAngle) / (halfAngle * 2 / dtSec);
+      _quatDelta.set(wx * axis, wy * axis, wz * axis, Math.cos(halfAngle));
+      _quatA.set(qx, qy, qz, qw);
+      _quatA.multiply(_quatDelta);
+      _quatA.normalize();
+      qw = _quatA.w; qx = _quatA.x; qy = _quatA.y; qz = _quatA.z;
+    }
+  }
+
   return {
     ...t,
     x, y, z,
+    qw, qx, qy, qz,
     altitude: r - 6371,
   };
 }
@@ -468,14 +504,15 @@ function updateScene() {
   const gmstDeg = (280.46061837 + 360.98564736629 * daysSinceJ2000) % 360;
   earthMesh.rotation.y = gmstDeg * Math.PI / 180;
 
-  // Orient Orion cone along velocity vector
+  // Orient Orion model
   if (usedLive && orionState.qw != null) {
     // Use actual spacecraft attitude quaternion from telemetry
     orionGroup.quaternion.set(orionState.qx, orionState.qz, -orionState.qy, orionState.qw);
   } else {
+    // Fallback: point nose (+X in body frame) along velocity
     const velDir = new THREE.Vector3(orionState.vx, orionState.vz, -orionState.vy).normalize();
-    const up = new THREE.Vector3(0, 1, 0);
-    const quat = new THREE.Quaternion().setFromUnitVectors(up, velDir);
+    const forward = new THREE.Vector3(1, 0, 0);
+    const quat = new THREE.Quaternion().setFromUnitVectors(forward, velDir);
     orionGroup.quaternion.copy(quat);
   }
 
