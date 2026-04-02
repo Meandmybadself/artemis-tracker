@@ -178,7 +178,7 @@ const elLoadingStatus = document.getElementById('loading-status');
 // --- Live telemetry polling ---
 async function pollTelemetry() {
   const now = performance.now();
-  if (now - lastTelemetryFetch < 1000) return; // poll every 1s
+  if (now - lastTelemetryFetch < 10000) return; // poll every 10s
   lastTelemetryFetch = now;
   try {
     const resp = await fetch('/api/telemetry');
@@ -223,6 +223,17 @@ function parseTelemetry(raw) {
     x: x / 1000, y: y / 1000, z: z / 1000,       // meters -> km
     vx: vx / 1000, vy: vy / 1000, vz: vz / 1000,  // m/s -> km/s
     qw, qx, qy, qz,
+    // Angular rates (deg/s)
+    rateRoll: p(2101), ratePitch: p(2102), rateYaw: p(2103),
+    // Thruster state flags
+    thr1: p(2040), thr2: p(2041), thr3: p(2042),
+    // RCS
+    rcs1: p(2091), rcs2: p(2092), rcs3: p(2093), rcs4: p(2094), rcs5: p(2095),
+    // Solar array params
+    solar2048: p(2048), solar2049: p(2049), solar2050: p(2050),
+    solar2051: p(2051), solar2052: p(2052), solar2053: p(2053),
+    // Status
+    statusFlag: p(2016),
     altitude: p(5001), // km (already in km from telemetry)
     raw,
   };
@@ -394,8 +405,8 @@ function updateScene() {
   elAltitude.textContent = formatDist(altitudeKm);
   elDataSource.textContent = usedLive ? 'NASA AROW (live)' : 'JPL Horizons';
   elDataSource.style.color = usedLive ? '#44ff88' : '#ddeeff';
-  if (usedLive && liveTelemetryTime) {
-    const ageSec = ((performance.now() - liveTelemetryTime) / 1000).toFixed(0);
+  if (usedLive && liveTelemetry?.date) {
+    const ageSec = Math.round((Date.now() - liveTelemetry.date.getTime()) / 1000);
     elDataAge.textContent = `${ageSec}s ago`;
   } else {
     elDataAge.textContent = liveMode ? 'waiting...' : '';
@@ -408,6 +419,9 @@ function updateScene() {
   elMetLabel.textContent = `MET: ${formatMET(met)}`;
   elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatSpeed();
   document.title = `MET ${formatMET(met)} | Alt ${formatDist(altitudeKm)}`;
+
+  // Update extended telemetry HUD
+  updateTelemetryHUD(usedLive ? liveTelemetry : null);
 
   // Timeline slider
   const frac = (currentTime.getTime() - timeStart.getTime()) / (timeEnd.getTime() - timeStart.getTime());
@@ -565,6 +579,68 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '4') document.getElementById('focus-free').click();
   if (e.key === 'l' || e.key === 'L') document.getElementById('btn-live').click();
 });
+
+// --- Collapsible telemetry section ---
+{
+  const header = document.getElementById('toggle-telemetry');
+  const body = document.getElementById('section-telemetry');
+  header.addEventListener('click', () => {
+    header.classList.toggle('open');
+    body.classList.toggle('open');
+  });
+}
+
+// --- Extended telemetry HUD ---
+function tv(val, decimals = 4) {
+  if (val == null) return '\u2014';
+  return typeof val === 'number' ? val.toFixed(decimals) : String(val);
+}
+
+function setTelem(id, val, decimals = 4) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = tv(val, decimals);
+  el.textContent = text;
+  el.classList.toggle('telemetry-na', val == null);
+}
+
+function updateTelemetryHUD(telem) {
+  // Attitude
+  setTelem('att-qw', telem?.qw);
+  setTelem('att-qx', telem?.qx);
+  setTelem('att-qy', telem?.qy);
+  setTelem('att-qz', telem?.qz);
+  setTelem('rate-roll', telem?.rateRoll, 3);
+  setTelem('rate-pitch', telem?.ratePitch, 3);
+  setTelem('rate-yaw', telem?.rateYaw, 3);
+
+  // Propulsion
+  setTelem('thr-1', telem?.thr1, 0);
+  setTelem('thr-2', telem?.thr2, 0);
+  setTelem('thr-3', telem?.thr3, 0);
+  setTelem('rcs-1', telem?.rcs1, 0);
+  setTelem('rcs-2', telem?.rcs2, 0);
+  setTelem('rcs-3', telem?.rcs3, 0);
+  setTelem('rcs-4', telem?.rcs4, 0);
+  setTelem('rcs-5', telem?.rcs5, 0);
+
+  // Solar arrays
+  setTelem('solar-2048', telem?.solar2048, 2);
+  setTelem('solar-2049', telem?.solar2049, 2);
+  setTelem('solar-2050', telem?.solar2050, 2);
+  setTelem('solar-2051', telem?.solar2051, 2);
+  setTelem('solar-2052', telem?.solar2052, 2);
+  setTelem('solar-2053', telem?.solar2053, 2);
+
+  // Status
+  const flagVal = telem?.statusFlag;
+  const flagEl = document.getElementById('status-flag');
+  if (flagEl) {
+    flagEl.textContent = flagVal != null ? '0x' + Math.round(flagVal).toString(16).toUpperCase() : '\u2014';
+    flagEl.classList.toggle('telemetry-na', flagVal == null);
+  }
+  setTelem('telem-alt', telem?.altitude, 1);
+}
 
 // --- Start ---
 init();

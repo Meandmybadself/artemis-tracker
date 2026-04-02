@@ -3,7 +3,7 @@ const TELEMETRY_OBJECTS = {
   orion: 'October/1/October_105_1.txt',
   icps: 'Io/2/Io_108_2.txt',
 };
-const CACHE_TTL_SECONDS = 2;
+const CACHE_TTL_SECONDS = 10;
 
 async function fetchGCSObject(objPath) {
   const encoded = encodeURIComponent(objPath);

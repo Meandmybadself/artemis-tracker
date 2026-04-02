@@ -28,6 +28,19 @@
     .stat { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
     .stat-label { color: #8899bb; }
     .stat-value { color: #ddeeff; font-variant-numeric: tabular-nums; }
+    .section-header {
+      font-size: 11px; font-weight: 600; color: #5580aa; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-top: 10px; padding-top: 8px;
+      border-top: 1px solid rgba(100,140,255,0.15); margin-bottom: 6px;
+      cursor: pointer; user-select: none;
+    }
+    .section-header:hover { color: #7eb8ff; }
+    .section-header::before { content: '\25B6 '; font-size: 8px; }
+    .section-header.open::before { content: '\25BC '; font-size: 8px; }
+    .section-body { display: none; }
+    .section-body.open { display: block; }
+    .telemetry-na { color: #445566; }
+    #info-panel { max-height: calc(100vh - 160px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(100,140,255,0.3) transparent; }
 
     #controls-panel {
       position: absolute; bottom: 0; left: 0; right: 0;
@@ -121,6 +134,33 @@
       </div>
       <div class="stat">
         <span class="stat-label">Last update</span><span class="stat-value" id="data-age"></span>
+      </div>
+
+      <div class="section-header" id="toggle-telemetry">Raw Telemetry</div>
+      <div class="section-body" id="section-telemetry">
+        <div class="stat"><span class="stat-label">Quaternion (w)</span><span class="stat-value telemetry-na" id="att-qw">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Quaternion (x)</span><span class="stat-value telemetry-na" id="att-qx">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Quaternion (y)</span><span class="stat-value telemetry-na" id="att-qy">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Quaternion (z)</span><span class="stat-value telemetry-na" id="att-qz">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Roll rate (deg/s)</span><span class="stat-value telemetry-na" id="rate-roll">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Pitch rate (deg/s)</span><span class="stat-value telemetry-na" id="rate-pitch">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Yaw rate (deg/s)</span><span class="stat-value telemetry-na" id="rate-yaw">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Thruster 1</span><span class="stat-value telemetry-na" id="thr-1">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Thruster 2</span><span class="stat-value telemetry-na" id="thr-2">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Thruster 3</span><span class="stat-value telemetry-na" id="thr-3">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">RCS 1</span><span class="stat-value telemetry-na" id="rcs-1">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">RCS 2</span><span class="stat-value telemetry-na" id="rcs-2">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">RCS 3</span><span class="stat-value telemetry-na" id="rcs-3">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">RCS 4</span><span class="stat-value telemetry-na" id="rcs-4">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">RCS 5</span><span class="stat-value telemetry-na" id="rcs-5">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Solar 2048</span><span class="stat-value telemetry-na" id="solar-2048">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Solar 2049</span><span class="stat-value telemetry-na" id="solar-2049">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Solar 2050</span><span class="stat-value telemetry-na" id="solar-2050">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Solar 2051</span><span class="stat-value telemetry-na" id="solar-2051">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Solar 2052</span><span class="stat-value telemetry-na" id="solar-2052">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Solar 2053</span><span class="stat-value telemetry-na" id="solar-2053">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Status flag</span><span class="stat-value telemetry-na" id="status-flag">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">Altitude (telem)</span><span class="stat-value telemetry-na" id="telem-alt">&mdash;</span></div>
       </div>
     </div>
   </div>
