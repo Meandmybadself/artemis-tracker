@@ -1,0 +1,10 @@
+name = "artemis-viewer"
+main = "src/worker.js"
+compatibility_date = "2024-12-01"
+
+[assets]
+directory = "public"
+
+[[routes]]
+pattern = "artemistracker.mapki.com"
+custom_domain = true
