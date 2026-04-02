@@ -24,6 +24,11 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 1;
 controls.maxDistance = 5000;
+controls.addEventListener('start', () => {
+  focusTarget = 'free';
+  document.querySelectorAll('#focus-btns .btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('focus-free').classList.add('active');
+});
 
 // --- Lighting ---
 const ambientLight = new THREE.AmbientLight(0x222244, 0.3);
@@ -251,6 +256,7 @@ let speedMultiplier = 60; // 1 real second = 60 mission seconds
 const speedSteps = [1, 10, 30, 60, 120, 300, 600, 1800, 3600];
 let speedIdx = 3;
 let useImperial = false; // toggle with 'u' key
+let useLocalTime = false; // toggle with 't' key
 let focusTarget = 'orion'; // 'earth', 'moon', 'orion', 'free'
 let lastRealTime = null;
 
@@ -518,11 +524,13 @@ function updateScene() {
   }
   // Time display — in live mode, always use wall clock for ticking display
   const displayTime = liveMode ? new Date() : currentTime;
-  const timeStr = displayTime.toUTCString().replace('GMT', 'UTC');
-  elTimeLabel.textContent = liveMode ? `${timeStr}  [LIVE]` : timeStr;
+  const timeStr = useLocalTime
+    ? displayTime.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })
+    : displayTime.toUTCString().replace('GMT', 'UTC');
+  elTimeLabel.textContent = timeStr;
   const met = displayTime.getTime() - LAUNCH_TIME.getTime();
   elMetLabel.textContent = `MET: ${formatMET(met)}`;
-  elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatSpeed();
+  elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatPlaybackSpeed();
   document.title = `MET ${formatMET(met)} | Alt ${formatDist(altitudeKm)}`;
 
   // Update extended telemetry HUD
@@ -698,6 +706,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '4') document.getElementById('focus-free').click();
   if (e.key === 'l' || e.key === 'L') document.getElementById('btn-live').click();
   if (e.key === 'u' || e.key === 'U') useImperial = !useImperial;
+  if (e.key === 't' || e.key === 'T') useLocalTime = !useLocalTime;
 });
 
 // --- Collapsible telemetry section ---
