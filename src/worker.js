@@ -24,8 +24,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname !== '/api/telemetry') {
-      // Let the assets system handle everything else
-      return env.ASSETS.fetch(request);
+      return new Response('Not found', { status: 404 });
     }
 
     // Check cache first
