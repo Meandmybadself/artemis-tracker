@@ -32,6 +32,7 @@ def fetch(command, center='500@399'):
         'VEC_TABLE': "'2'",
         'VEC_LABELS': "'NO'",
         'CSV_FORMAT': "'YES'",
+        'REF_PLANE': "'FRAME'",
     })
     url = f'{API_BASE}?{params}'
     print(f'  Fetching {url[:100]}...')
