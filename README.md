@@ -10,14 +10,16 @@ In live mode, the viewer dead-reckons Orion's position between telemetry updates
 ## Running
 
 ```bash
-# Fetch trajectory data from JPL Horizons (only needed once)
-python3 fetch_data.py
+npm install
 
-# Start the server (serves static files + proxies live telemetry)
-python3 server.py
+# Local development
+npm run dev
 
-# Open http://localhost:8090
+# Deploy to Cloudflare
+npm run deploy
 ```
+
+The site is deployed at [artemistracker.mapki.com](https://artemistracker.mapki.com).
 
 ## Controls
 
@@ -30,20 +32,32 @@ python3 server.py
 | L | Toggle live mode |
 | Left/Right arrows | Slower/Faster playback |
 | 1/2/3/4 | Focus Earth/Orion/Moon/Free camera |
+| U | Toggle imperial/metric units |
+| T | Toggle local/UTC time |
+| ? | Show keyboard shortcuts |
 
 ## Architecture
 
 ```
-artemis-viz/
-  index.html          # UI layout and styles
-  server.py           # Python dev server + AROW telemetry proxy
-  fetch_data.py       # One-time script to download Horizons ephemeris
-  data/
-    orion.json         # Orion trajectory (1,279 points, 10-min intervals)
-    moon.json          # Moon ephemeris (same cadence)
+public/                  # Static assets (served by Cloudflare Workers)
+  index.html             # UI layout and styles
   js/
-    main.js            # Three.js scene, animation loop, HUD, controls
-    horizons.js        # Data loading and interpolation
+    main.js              # Three.js scene, animation loop, HUD, controls
+    horizons.js          # Data loading and interpolation
+  data/
+    orion.json           # Orion trajectory (1,279 points, 10-min intervals)
+    moon.json            # Moon ephemeris (same cadence)
+    sun.json             # Sun ephemeris (same cadence)
+    stars.json           # HYG star catalog (mag < 6.5)
+  textures/
+    earth.jpg            # Blue Marble day texture
+    earth-night.jpg      # City lights night texture
+    moon.jpg             # Lunar surface texture
+src/
+  worker.js              # Cloudflare Worker — proxies NASA AROW telemetry
+server.py                # Local dev server (legacy)
+fetch_data.py            # One-time script to download Horizons ephemeris
+wrangler.toml            # Cloudflare Workers config
 ```
 
 ## Data Sources
