@@ -153,25 +153,26 @@
       letter-spacing: 1px;
       margin-bottom: 6px;
     }
-    .stat-row {
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 12px;
+    }
+    .stat-cell {
       display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 4px;
-      gap: 6px;
+      flex-direction: column;
+      min-width: 0;
     }
     .lbl {
-      font-size: 13px;
+      font-size: 11px;
       color: var(--green-muted);
       letter-spacing: 0.5px;
       white-space: nowrap;
-      flex-shrink: 0;
     }
     .val {
       font-family: var(--font-display);
       font-size: 20px;
       color: var(--green);
-      text-align: right;
       text-shadow: var(--glow-sm);
       white-space: nowrap;
       overflow: hidden;
@@ -390,16 +391,20 @@
 
         <div class="data-panel">
           <div class="panel-hdr">╔═ NAVIGATION ═╗</div>
-          <div class="stat-row"><span class="lbl">DIST / EARTH</span><span class="val" id="dist-earth">——</span></div>
-          <div class="stat-row"><span class="lbl">DIST / MOON</span><span class="val" id="dist-moon">——</span></div>
-          <div class="stat-row"><span class="lbl">VELOCITY</span><span class="val" id="velocity">——</span></div>
-          <div class="stat-row"><span class="lbl">ALTITUDE</span><span class="val" id="altitude">——</span></div>
+          <div class="stat-grid">
+            <div class="stat-cell"><span class="lbl">DIST / EARTH</span><span class="val" id="dist-earth">——</span></div>
+            <div class="stat-cell"><span class="lbl">DIST / MOON</span><span class="val" id="dist-moon">——</span></div>
+            <div class="stat-cell"><span class="lbl">VELOCITY</span><span class="val" id="velocity">——</span></div>
+            <div class="stat-cell"><span class="lbl">ALTITUDE</span><span class="val" id="altitude">——</span></div>
+          </div>
         </div>
 
         <div class="data-panel">
           <div class="panel-hdr">╔═ DATALINK ═╗</div>
-          <div class="stat-row"><span class="lbl">SOURCE</span><span class="val" id="data-source">HORIZONS</span></div>
-          <div class="stat-row"><span class="lbl">LAST UPDATE</span><span class="val" id="data-age">——</span></div>
+          <div class="stat-grid">
+            <div class="stat-cell"><span class="lbl">SOURCE</span><span class="val" id="data-source">HORIZONS</span></div>
+            <div class="stat-cell"><span class="lbl">LAST UPDATE</span><span class="val" id="data-age">——</span></div>
+          </div>
           <div id="trajectory-note">
             ⚠ TRAJECTORY: PRE-LAUNCH PREDICTION<br>SOURCE: JPL HORIZONS
           </div>
@@ -407,37 +412,43 @@
 
         <div class="data-panel">
           <div class="panel-hdr">╔═ ATTITUDE ═╗</div>
-          <div class="stat-row"><span class="lbl">QUAT W</span><span class="val na" id="att-qw">——</span></div>
-          <div class="stat-row"><span class="lbl">QUAT X</span><span class="val na" id="att-qx">——</span></div>
-          <div class="stat-row"><span class="lbl">QUAT Y</span><span class="val na" id="att-qy">——</span></div>
-          <div class="stat-row"><span class="lbl">QUAT Z</span><span class="val na" id="att-qz">——</span></div>
-          <div class="stat-row"><span class="lbl">ROLL RATE</span><span class="val na" id="rate-roll">——</span></div>
-          <div class="stat-row"><span class="lbl">PITCH RATE</span><span class="val na" id="rate-pitch">——</span></div>
-          <div class="stat-row"><span class="lbl">YAW RATE</span><span class="val na" id="rate-yaw">——</span></div>
+          <div class="stat-grid">
+            <div class="stat-cell"><span class="lbl">QUAT W</span><span class="val na" id="att-qw">——</span></div>
+            <div class="stat-cell"><span class="lbl">QUAT X</span><span class="val na" id="att-qx">——</span></div>
+            <div class="stat-cell"><span class="lbl">QUAT Y</span><span class="val na" id="att-qy">——</span></div>
+            <div class="stat-cell"><span class="lbl">QUAT Z</span><span class="val na" id="att-qz">——</span></div>
+            <div class="stat-cell"><span class="lbl">ROLL RATE</span><span class="val na" id="rate-roll">——</span></div>
+            <div class="stat-cell"><span class="lbl">PITCH RATE</span><span class="val na" id="rate-pitch">——</span></div>
+            <div class="stat-cell"><span class="lbl">YAW RATE</span><span class="val na" id="rate-yaw">——</span></div>
+          </div>
         </div>
 
         <div class="data-panel">
           <div class="panel-hdr">╔═ PROPULSION ═╗</div>
-          <div class="stat-row"><span class="lbl">THRUSTER 1</span><span class="val na" id="thr-1">——</span></div>
-          <div class="stat-row"><span class="lbl">THRUSTER 2</span><span class="val na" id="thr-2">——</span></div>
-          <div class="stat-row"><span class="lbl">THRUSTER 3</span><span class="val na" id="thr-3">——</span></div>
-          <div class="stat-row"><span class="lbl">RCS 1</span><span class="val na" id="rcs-1">——</span></div>
-          <div class="stat-row"><span class="lbl">RCS 2</span><span class="val na" id="rcs-2">——</span></div>
-          <div class="stat-row"><span class="lbl">RCS 3</span><span class="val na" id="rcs-3">——</span></div>
-          <div class="stat-row"><span class="lbl">RCS 4</span><span class="val na" id="rcs-4">——</span></div>
-          <div class="stat-row"><span class="lbl">RCS 5</span><span class="val na" id="rcs-5">——</span></div>
+          <div class="stat-grid">
+            <div class="stat-cell"><span class="lbl">THRUSTER 1</span><span class="val na" id="thr-1">——</span></div>
+            <div class="stat-cell"><span class="lbl">THRUSTER 2</span><span class="val na" id="thr-2">——</span></div>
+            <div class="stat-cell"><span class="lbl">THRUSTER 3</span><span class="val na" id="thr-3">——</span></div>
+            <div class="stat-cell"><span class="lbl">RCS 1</span><span class="val na" id="rcs-1">——</span></div>
+            <div class="stat-cell"><span class="lbl">RCS 2</span><span class="val na" id="rcs-2">——</span></div>
+            <div class="stat-cell"><span class="lbl">RCS 3</span><span class="val na" id="rcs-3">——</span></div>
+            <div class="stat-cell"><span class="lbl">RCS 4</span><span class="val na" id="rcs-4">——</span></div>
+            <div class="stat-cell"><span class="lbl">RCS 5</span><span class="val na" id="rcs-5">——</span></div>
+          </div>
         </div>
 
         <div class="data-panel">
           <div class="panel-hdr">╔═ SOLAR ARRAYS ═╗</div>
-          <div class="stat-row"><span class="lbl">SAW 2048</span><span class="val na" id="solar-2048">——</span></div>
-          <div class="stat-row"><span class="lbl">SAW 2049</span><span class="val na" id="solar-2049">——</span></div>
-          <div class="stat-row"><span class="lbl">SAW 2050</span><span class="val na" id="solar-2050">——</span></div>
-          <div class="stat-row"><span class="lbl">SAW 2051</span><span class="val na" id="solar-2051">——</span></div>
-          <div class="stat-row"><span class="lbl">SAW 2052</span><span class="val na" id="solar-2052">——</span></div>
-          <div class="stat-row"><span class="lbl">SAW 2053</span><span class="val na" id="solar-2053">——</span></div>
-          <div class="stat-row"><span class="lbl">STATUS FLAG</span><span class="val na" id="status-flag">——</span></div>
-          <div class="stat-row"><span class="lbl">ALT (TELEM)</span><span class="val na" id="telem-alt">——</span></div>
+          <div class="stat-grid">
+            <div class="stat-cell"><span class="lbl">SAW 2048</span><span class="val na" id="solar-2048">——</span></div>
+            <div class="stat-cell"><span class="lbl">SAW 2049</span><span class="val na" id="solar-2049">——</span></div>
+            <div class="stat-cell"><span class="lbl">SAW 2050</span><span class="val na" id="solar-2050">——</span></div>
+            <div class="stat-cell"><span class="lbl">SAW 2051</span><span class="val na" id="solar-2051">——</span></div>
+            <div class="stat-cell"><span class="lbl">SAW 2052</span><span class="val na" id="solar-2052">——</span></div>
+            <div class="stat-cell"><span class="lbl">SAW 2053</span><span class="val na" id="solar-2053">——</span></div>
+            <div class="stat-cell"><span class="lbl">STATUS FLAG</span><span class="val na" id="status-flag">——</span></div>
+            <div class="stat-cell"><span class="lbl">ALT (TELEM)</span><span class="val na" id="telem-alt">——</span></div>
+          </div>
         </div>
 
       </div><!-- /data-section -->
