@@ -1,0 +1,570 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { fetchTrajectoryData, interpolate, LAUNCH_TIME } from './horizons.js';
+
+// --- Constants ---
+// Scale: 1 unit = 1000 km
+const SCALE = 1 / 1000;
+const EARTH_RADIUS = 6371 * SCALE;
+const MOON_RADIUS = 1737 * SCALE;
+
+// --- Scene setup ---
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 50000);
+camera.position.set(0, 300, 400);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 1;
+controls.maxDistance = 5000;
+
+// --- Lighting ---
+const ambientLight = new THREE.AmbientLight(0x222244, 0.5);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
+sunLight.position.set(500, 200, 300);
+scene.add(sunLight);
+
+// --- Starfield ---
+function createStarfield() {
+  const count = 8000;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 8000 + Math.random() * 2000;
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3 + 2] = r * Math.cos(phi);
+    const brightness = 0.5 + Math.random() * 0.5;
+    const tint = Math.random();
+    colors[i * 3] = brightness * (tint > 0.8 ? 1.0 : 0.9);
+    colors[i * 3 + 1] = brightness * 0.92;
+    colors[i * 3 + 2] = brightness * (tint < 0.2 ? 1.0 : 0.95);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({ size: 1.5, vertexColors: true, sizeAttenuation: false });
+  scene.add(new THREE.Points(geo, mat));
+}
+createStarfield();
+
+// --- Earth ---
+const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
+const earthMat = new THREE.MeshPhongMaterial({
+  color: 0x2244aa,
+  emissive: 0x112244,
+  emissiveIntensity: 0.15,
+  shininess: 25,
+});
+const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+scene.add(earthMesh);
+
+// Earth atmosphere glow
+const glowGeo = new THREE.SphereGeometry(EARTH_RADIUS * 1.03, 64, 64);
+const glowMat = new THREE.MeshBasicMaterial({
+  color: 0x4488ff,
+  transparent: true,
+  opacity: 0.12,
+  side: THREE.BackSide,
+});
+scene.add(new THREE.Mesh(glowGeo, glowMat));
+
+// Earth grid lines (to give sense of rotation/scale)
+const earthGridMat = new THREE.MeshBasicMaterial({ color: 0x3366aa, wireframe: true, transparent: true, opacity: 0.15 });
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(EARTH_RADIUS * 1.002, 24, 24), earthGridMat));
+
+// --- Moon ---
+const moonGeo = new THREE.SphereGeometry(MOON_RADIUS, 32, 32);
+const moonMat = new THREE.MeshPhongMaterial({
+  color: 0x999999,
+  emissive: 0x222222,
+  emissiveIntensity: 0.1,
+  shininess: 5,
+});
+const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+scene.add(moonMesh);
+
+// --- Orion spacecraft marker ---
+const orionGroup = new THREE.Group();
+// Cone body
+const orionCone = new THREE.Mesh(
+  new THREE.ConeGeometry(0.8, 2.0, 8),
+  new THREE.MeshPhongMaterial({ color: 0xeeeeee, emissive: 0x445566, emissiveIntensity: 0.3 })
+);
+orionCone.rotation.x = Math.PI;
+orionGroup.add(orionCone);
+// Glow ring
+const orionRing = new THREE.Mesh(
+  new THREE.RingGeometry(1.2, 1.8, 32),
+  new THREE.MeshBasicMaterial({ color: 0x55aaff, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+);
+orionGroup.add(orionRing);
+scene.add(orionGroup);
+
+// --- Trajectory line ---
+let orionTrailLine;
+let moonTrailLine;
+
+// --- Labels (CSS-style via sprites) ---
+function makeLabel(text, color = '#7eb8ff') {
+  const cvs = document.createElement('canvas');
+  cvs.width = 256;
+  cvs.height = 64;
+  const ctx = cvs.getContext('2d');
+  ctx.font = 'bold 28px Helvetica Neue, sans-serif';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 128, 40);
+  const tex = new THREE.CanvasTexture(cvs);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(20, 5, 1);
+  return sprite;
+}
+
+const earthLabel = makeLabel('Earth', '#5599ff');
+earthLabel.position.set(0, EARTH_RADIUS + 8, 0);
+scene.add(earthLabel);
+
+const moonLabel = makeLabel('Moon', '#aaaaaa');
+scene.add(moonLabel);
+
+const orionLabel = makeLabel('Orion', '#ffaa44');
+scene.add(orionLabel);
+
+// --- State ---
+let data = null;
+let currentTime = null;
+let timeStart = null;
+let timeEnd = null;
+let playing = false;
+let liveMode = false;
+let liveTelemetry = null; // latest from NASA AROW
+let prevLiveTelemetry = null; // previous sample for interpolation
+let liveTelemetryTime = 0; // performance.now() when liveTelemetry was received
+let lastTelemetryFetch = 0;
+let speedMultiplier = 60; // 1 real second = 60 mission seconds
+const speedSteps = [1, 10, 30, 60, 120, 300, 600, 1800, 3600];
+let speedIdx = 3;
+let focusTarget = 'orion'; // 'earth', 'moon', 'orion', 'free'
+let lastRealTime = null;
+
+// --- UI elements ---
+const elDataSource = document.getElementById('data-source');
+const elDataAge = document.getElementById('data-age');
+const elDistEarth = document.getElementById('dist-earth');
+const elDistMoon = document.getElementById('dist-moon');
+const elVelocity = document.getElementById('velocity');
+const elAltitude = document.getElementById('altitude');
+const elTimeLabel = document.getElementById('time-label');
+const elMetLabel = document.getElementById('met-label');
+const elTimeline = document.getElementById('timeline');
+const elBtnPlay = document.getElementById('btn-play');
+const elSpeedDisplay = document.getElementById('speed-display');
+const elLoading = document.getElementById('loading');
+const elLoadingStatus = document.getElementById('loading-status');
+
+// --- Live telemetry polling ---
+async function pollTelemetry() {
+  const now = performance.now();
+  if (now - lastTelemetryFetch < 1000) return; // poll every 1s
+  lastTelemetryFetch = now;
+  try {
+    const resp = await fetch('/api/telemetry');
+    const telData = await resp.json();
+    if (telData.orion && telData.orion.File && telData.orion.File.Activity === 'MIS') {
+      const parsed = parseTelemetry(telData.orion);
+      if (parsed) {
+        prevLiveTelemetry = liveTelemetry;
+        liveTelemetry = parsed;
+        liveTelemetryTime = performance.now();
+      }
+    }
+  } catch (e) {
+    console.warn('Telemetry poll error:', e);
+  }
+}
+
+function parseTelemetry(raw) {
+  const p = (num) => {
+    const param = raw[`Parameter_${num}`];
+    return param ? parseFloat(param.Value) : null;
+  };
+  // Positions in meters from Earth center, convert to km
+  const x = p(2003); const y = p(2004); const z = p(2005);
+  if (x == null || y == null || z == null) return null;
+  // Velocities in m/s, convert to km/s
+  const vx = p(2009); const vy = p(2010); const vz = p(2011);
+  // Attitude quaternion
+  const qw = p(2012); const qx = p(2013); const qy = p(2014); const qz = p(2015);
+  // Parse timestamp from parameter time field "2026:091:23:45:04.722"
+  const timeStr = raw.Parameter_2003?.Time;
+  let date = new Date();
+  if (timeStr) {
+    const m = timeStr.match(/(\d{4}):(\d{3}):(\d{2}):(\d{2}):(\d{2})/);
+    if (m) {
+      const jan1 = new Date(Date.UTC(+m[1], 0, 1));
+      date = new Date(jan1.getTime() + (+m[2] - 1) * 86400000 + +m[3] * 3600000 + +m[4] * 60000 + +m[5] * 1000);
+    }
+  }
+  return {
+    date,
+    x: x / 1000, y: y / 1000, z: z / 1000,       // meters -> km
+    vx: vx / 1000, vy: vy / 1000, vz: vz / 1000,  // m/s -> km/s
+    qw, qx, qy, qz,
+    altitude: p(5001), // km (already in km from telemetry)
+    raw,
+  };
+}
+
+// --- Data loading ---
+async function init() {
+  try {
+    data = await fetchTrajectoryData(status => {
+      elLoadingStatus.textContent = status;
+    });
+
+    timeStart = data.orion[0].date;
+    timeEnd = data.orion[data.orion.length - 1].date;
+
+    // Start in live mode if mission is underway or hasn't started yet
+    const now = new Date();
+    if (now >= LAUNCH_TIME && now <= timeEnd) {
+      setLiveMode(true);
+    } else {
+      currentTime = new Date(timeStart);
+    }
+
+    buildTrajectoryLines();
+    elLoading.style.display = 'none';
+    lastRealTime = performance.now();
+    animate();
+  } catch (err) {
+    elLoadingStatus.textContent = `Error: ${err.message}`;
+    console.error(err);
+  }
+}
+
+function buildTrajectoryLines() {
+  // Orion full trajectory path
+  const orionPts = data.orion.map(p => new THREE.Vector3(p.x * SCALE, p.z * SCALE, -p.y * SCALE));
+  const orionGeo = new THREE.BufferGeometry().setFromPoints(orionPts);
+  const orionMat = new THREE.LineBasicMaterial({ color: 0xff8844, transparent: true, opacity: 0.6 });
+  orionTrailLine = new THREE.Line(orionGeo, orionMat);
+  scene.add(orionTrailLine);
+
+  // Moon trajectory path
+  const moonPts = data.moon.map(p => new THREE.Vector3(p.x * SCALE, p.z * SCALE, -p.y * SCALE));
+  const moonGeo = new THREE.BufferGeometry().setFromPoints(moonPts);
+  const moonMat = new THREE.LineBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.3 });
+  moonTrailLine = new THREE.Line(moonGeo, moonMat);
+  scene.add(moonTrailLine);
+}
+
+function toScene(p) {
+  // Horizons ecliptic J2000: X, Y in ecliptic plane, Z north
+  // Three.js: Y is up. Map ecliptic X -> scene X, ecliptic Z -> scene Y (up), ecliptic Y -> scene -Z
+  return new THREE.Vector3(p.x * SCALE, p.z * SCALE, -p.y * SCALE);
+}
+
+// Convert equatorial J2000 (NASA telemetry) to ecliptic, then to scene coords
+const OBLIQUITY = 23.4393 * Math.PI / 180;
+const cosObl = Math.cos(OBLIQUITY);
+const sinObl = Math.sin(OBLIQUITY);
+function equatorialToScene(p) {
+  // Equatorial -> Ecliptic: rotate around X by obliquity
+  const ex = p.x;
+  const ey = p.y * cosObl + p.z * sinObl;
+  const ez = -p.y * sinObl + p.z * cosObl;
+  // Ecliptic -> Scene
+  return new THREE.Vector3(ex * SCALE, ez * SCALE, -ey * SCALE);
+}
+
+// Extrapolate live telemetry position using velocity for smooth inter-sample motion
+function getLiveState() {
+  if (!liveTelemetry) return null;
+  const t = liveTelemetry;
+  const dtSec = (performance.now() - liveTelemetryTime) / 1000;
+  const vx = t.vx || 0, vy = t.vy || 0, vz = t.vz || 0;
+  const x = t.x + vx * dtSec;
+  const y = t.y + vy * dtSec;
+  const z = t.z + vz * dtSec;
+  const r = Math.sqrt(x * x + y * y + z * z);
+  return {
+    ...t,
+    x, y, z,
+    altitude: r - 6371,
+  };
+}
+
+function updateScene() {
+  if (!data) return;
+
+  // Use live NASA telemetry for Orion position when in live mode
+  let orionState;
+  let usedLive = false;
+  if (liveMode && liveTelemetry) {
+    orionState = getLiveState();
+    usedLive = true;
+  } else {
+    orionState = interpolate(data.orion, currentTime);
+  }
+  const moonState = interpolate(data.moon, currentTime);
+
+  // NASA telemetry is Earth-centered J2000 equatorial (X,Y,Z in km after our conversion)
+  // Horizons data is ecliptic J2000. For the Moon we always use ecliptic.
+  // For Orion in live mode, the telemetry coords need equatorial->ecliptic conversion.
+  // Ecliptic obliquity ~23.4393 degrees
+  let orionPos;
+  if (usedLive) {
+    orionPos = equatorialToScene(orionState);
+  } else {
+    orionPos = toScene(orionState);
+  }
+  const moonPos = toScene(moonState);
+
+  // Update object positions
+  moonMesh.position.copy(moonPos);
+  orionGroup.position.copy(orionPos);
+
+  // Orient Orion cone along velocity vector
+  if (usedLive && orionState.qw != null) {
+    // Use actual spacecraft attitude quaternion from telemetry
+    orionGroup.quaternion.set(orionState.qx, orionState.qz, -orionState.qy, orionState.qw);
+  } else {
+    const velDir = new THREE.Vector3(orionState.vx, orionState.vz, -orionState.vy).normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    const quat = new THREE.Quaternion().setFromUnitVectors(up, velDir);
+    orionGroup.quaternion.copy(quat);
+  }
+
+  // Labels follow objects
+  moonLabel.position.copy(moonPos).add(new THREE.Vector3(0, MOON_RADIUS + 5, 0));
+  orionLabel.position.copy(orionPos).add(new THREE.Vector3(0, 4, 0));
+
+  // Scale orion marker based on camera distance
+  const camDist = camera.position.distanceTo(orionPos);
+  const markerScale = Math.max(0.3, Math.min(3, camDist / 80));
+  orionGroup.scale.setScalar(markerScale);
+  orionRing.lookAt(camera.position);
+
+  // Camera tracking
+  if (focusTarget === 'orion') {
+    controls.target.lerp(orionPos, 0.05);
+  } else if (focusTarget === 'moon') {
+    controls.target.lerp(moonPos, 0.05);
+  } else if (focusTarget === 'earth') {
+    controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.05);
+  }
+
+  // Update HUD — for live telemetry, compute distances in the original frame
+  let distEarthKm, distMoonKm, speed, altitudeKm;
+  if (usedLive) {
+    // Live telemetry is equatorial; Moon data is ecliptic. Compute Earth dist directly.
+    distEarthKm = Math.sqrt(orionState.x ** 2 + orionState.y ** 2 + orionState.z ** 2);
+    // For Moon distance, use scene positions (already converted)
+    distMoonKm = orionPos.distanceTo(moonPos) / SCALE;
+    speed = Math.sqrt(orionState.vx ** 2 + orionState.vy ** 2 + orionState.vz ** 2);
+    altitudeKm = orionState.altitude != null ? orionState.altitude : (distEarthKm - 6371);
+  } else {
+    distEarthKm = Math.sqrt(orionState.x ** 2 + orionState.y ** 2 + orionState.z ** 2);
+    distMoonKm = Math.sqrt(
+      (orionState.x - moonState.x) ** 2 +
+      (orionState.y - moonState.y) ** 2 +
+      (orionState.z - moonState.z) ** 2
+    );
+    speed = Math.sqrt(orionState.vx ** 2 + orionState.vy ** 2 + orionState.vz ** 2);
+    altitudeKm = distEarthKm - 6371;
+  }
+
+  elDistEarth.textContent = formatDist(distEarthKm);
+  elDistMoon.textContent = formatDist(distMoonKm);
+  elVelocity.textContent = `${(speed).toFixed(2)} km/s (${(speed * 3600).toFixed(0)} km/h)`;
+  elAltitude.textContent = formatDist(altitudeKm);
+  elDataSource.textContent = usedLive ? 'NASA AROW (live)' : 'JPL Horizons';
+  elDataSource.style.color = usedLive ? '#44ff88' : '#ddeeff';
+  if (usedLive && liveTelemetryTime) {
+    const ageSec = ((performance.now() - liveTelemetryTime) / 1000).toFixed(0);
+    elDataAge.textContent = `${ageSec}s ago`;
+  } else {
+    elDataAge.textContent = liveMode ? 'waiting...' : '';
+  }
+  // Time display — in live mode, always use wall clock for ticking display
+  const displayTime = liveMode ? new Date() : currentTime;
+  const timeStr = displayTime.toUTCString().replace('GMT', 'UTC');
+  elTimeLabel.textContent = liveMode ? `${timeStr}  [LIVE]` : timeStr;
+  const met = displayTime.getTime() - LAUNCH_TIME.getTime();
+  elMetLabel.textContent = `MET: ${formatMET(met)}`;
+  elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatSpeed();
+  document.title = `MET ${formatMET(met)} | Alt ${formatDist(altitudeKm)}`;
+
+  // Timeline slider
+  const frac = (currentTime.getTime() - timeStart.getTime()) / (timeEnd.getTime() - timeStart.getTime());
+  elTimeline.value = Math.round(frac * 1000);
+}
+
+function formatDist(km) {
+  if (km >= 1000) return `${km.toLocaleString('en-US', { maximumFractionDigits: 0 })} km`;
+  return `${km.toFixed(1)} km`;
+}
+
+function formatMET(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const days = Math.floor(totalSec / 86400);
+  const hrs = Math.floor((totalSec % 86400) / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  const tenths = Math.floor((ms % 1000) / 100);
+  const base = `${days}d ${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  return liveMode ? `${base}.${tenths}` : base;
+}
+
+// --- Live mode ---
+const elBtnLive = document.getElementById('btn-live');
+const elLiveStatus = document.getElementById('live-status');
+
+function setLiveMode(on) {
+  liveMode = on;
+  if (on) {
+    playing = false;
+    elBtnPlay.textContent = '\u25B6 Play';
+    elBtnLive.classList.add('active');
+    speedMultiplier = 1;
+    speedIdx = 0;
+    updateSpeedDisplay();
+    updateLiveTime();
+  } else {
+    elBtnLive.classList.remove('active');
+    elLiveStatus.textContent = '';
+  }
+}
+
+function updateLiveTime() {
+  const wallNow = new Date();
+  if (wallNow < timeStart) {
+    // Before trajectory data begins — clamp to start, show countdown
+    currentTime = new Date(timeStart);
+    const secsUntil = Math.ceil((timeStart.getTime() - wallNow.getTime()) / 1000);
+    const mins = Math.floor(secsUntil / 60);
+    const secs = secsUntil % 60;
+    elLiveStatus.textContent = `Tracking data begins in ${mins}m ${String(secs).padStart(2, '0')}s (post-ICPS separation)`;
+  } else if (wallNow > timeEnd) {
+    currentTime = new Date(timeEnd);
+    elLiveStatus.textContent = 'Mission tracking data ended';
+  } else {
+    currentTime = wallNow;
+    elLiveStatus.textContent = liveTelemetry
+      ? 'Receiving live NASA telemetry'
+      : 'Waiting for telemetry...';
+  }
+}
+
+// --- Animation loop ---
+function animate() {
+  requestAnimationFrame(animate);
+
+  const now = performance.now();
+  if (liveMode) {
+    updateLiveTime();
+    pollTelemetry(); // non-blocking, rate-limited to every 2s
+  } else if (playing && lastRealTime) {
+    const dtReal = (now - lastRealTime) / 1000;
+    const dtMission = dtReal * speedMultiplier * 1000;
+    currentTime = new Date(Math.min(currentTime.getTime() + dtMission, timeEnd.getTime()));
+    if (currentTime.getTime() >= timeEnd.getTime()) {
+      playing = false;
+      elBtnPlay.textContent = '\u25B6 Play';
+    }
+  }
+  lastRealTime = now;
+
+  updateScene();
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// --- UI event handlers ---
+elBtnPlay.addEventListener('click', () => {
+  if (liveMode) setLiveMode(false);
+  playing = !playing;
+  elBtnPlay.textContent = playing ? '\u23F8 Pause' : '\u25B6 Play';
+  if (playing) lastRealTime = performance.now();
+});
+
+document.getElementById('btn-live').addEventListener('click', () => {
+  setLiveMode(!liveMode);
+});
+
+document.getElementById('btn-faster').addEventListener('click', () => {
+  if (liveMode) setLiveMode(false);
+  speedIdx = Math.min(speedIdx + 1, speedSteps.length - 1);
+  speedMultiplier = speedSteps[speedIdx];
+  playing = true;
+  elBtnPlay.textContent = '\u23F8 Pause';
+  updateSpeedDisplay();
+});
+
+document.getElementById('btn-slower').addEventListener('click', () => {
+  if (liveMode) setLiveMode(false);
+  speedIdx = Math.max(speedIdx - 1, 0);
+  speedMultiplier = speedSteps[speedIdx];
+  updateSpeedDisplay();
+});
+
+function formatSpeed() {
+  if (speedMultiplier >= 3600) return `${speedMultiplier / 3600}h/s`;
+  if (speedMultiplier >= 60) return `${speedMultiplier / 60}m/s`;
+  return `${speedMultiplier}x`;
+}
+function updateSpeedDisplay() {
+  elSpeedDisplay.textContent = liveMode ? 'LIVE' : formatSpeed();
+}
+updateSpeedDisplay();
+
+elTimeline.addEventListener('input', () => {
+  if (liveMode) setLiveMode(false);
+  const frac = parseInt(elTimeline.value) / 1000;
+  currentTime = new Date(timeStart.getTime() + frac * (timeEnd.getTime() - timeStart.getTime()));
+});
+
+// Focus buttons
+['earth', 'orion', 'moon', 'free'].forEach(target => {
+  document.getElementById(`focus-${target}`).addEventListener('click', () => {
+    focusTarget = target;
+    document.querySelectorAll('#focus-btns .btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`focus-${target}`).classList.add('active');
+  });
+});
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') { e.preventDefault(); elBtnPlay.click(); }
+  if (e.code === 'ArrowRight') document.getElementById('btn-faster').click();
+  if (e.code === 'ArrowLeft') document.getElementById('btn-slower').click();
+  if (e.key === '1') document.getElementById('focus-earth').click();
+  if (e.key === '2') document.getElementById('focus-orion').click();
+  if (e.key === '3') document.getElementById('focus-moon').click();
+  if (e.key === '4') document.getElementById('focus-free').click();
+  if (e.key === 'l' || e.key === 'L') document.getElementById('btn-live').click();
+});
+
+// --- Start ---
+init();

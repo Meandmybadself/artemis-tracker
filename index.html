@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artemis II Trajectory Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; color: #fff; font-family: 'Helvetica Neue', sans-serif; overflow: hidden; }
+    #canvas { display: block; width: 100vw; height: 100vh; }
+
+    #hud {
+      position: absolute; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 20px; pointer-events: none;
+    }
+    #hud > * { pointer-events: auto; }
+
+    #info-panel {
+      background: rgba(10, 15, 30, 0.85);
+      border: 1px solid rgba(100, 140, 255, 0.3);
+      border-radius: 8px;
+      padding: 16px 20px;
+      min-width: 280px;
+      backdrop-filter: blur(10px);
+    }
+    #info-panel h1 { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #7eb8ff; }
+    .stat { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+    .stat-label { color: #8899bb; }
+    .stat-value { color: #ddeeff; font-variant-numeric: tabular-nums; }
+
+    #controls-panel {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(10, 15, 30, 0.85);
+      border-top: 1px solid rgba(100, 140, 255, 0.2);
+      padding: 16px 24px;
+      backdrop-filter: blur(10px);
+    }
+    #timeline-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    #time-label { font-size: 13px; color: #7eb8ff; min-width: 200px; }
+    #met-label { font-size: 12px; color: #6688aa; }
+    #timeline {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 4px; background: rgba(100, 140, 255, 0.2); border-radius: 2px; cursor: pointer;
+    }
+    #timeline::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      background: #5599ff; border-radius: 50%; cursor: grab;
+    }
+    #btn-row { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      background: rgba(80, 130, 255, 0.15); border: 1px solid rgba(100, 140, 255, 0.3);
+      color: #aaccff; border-radius: 4px; padding: 5px 14px; cursor: pointer; font-size: 12px;
+    }
+    .btn:hover { background: rgba(80, 130, 255, 0.3); }
+    .btn.active { background: rgba(80, 130, 255, 0.4); border-color: #5599ff; color: #fff; }
+    #speed-display { font-size: 12px; color: #6688aa; margin-left: 8px; }
+
+    #focus-btns { display: flex; gap: 6px; margin-left: auto; }
+
+    #loading {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #000; z-index: 100;
+    }
+    #loading h2 { font-size: 18px; color: #7eb8ff; margin-bottom: 12px; }
+    #loading-status { font-size: 13px; color: #6688aa; }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid rgba(100, 140, 255, 0.2);
+      border-top-color: #5599ff; border-radius: 50%;
+      animation: spin 1s linear infinite; margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #live-status-row { min-height: 18px; margin-bottom: 4px; }
+    #live-status { font-size: 12px; color: #ffaa44; }
+
+    .live-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: #555; margin-right: 6px; vertical-align: middle;
+    }
+    #btn-live.active .live-dot {
+      background: #ff3333;
+      box-shadow: 0 0 6px #ff3333;
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    #btn-live.active {
+      border-color: #ff4444; color: #ff6666; background: rgba(255, 50, 50, 0.15);
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    #tooltip {
+      position: absolute; display: none;
+      background: rgba(10, 15, 30, 0.9); border: 1px solid rgba(100, 140, 255, 0.4);
+      border-radius: 6px; padding: 8px 12px; font-size: 12px;
+      pointer-events: none; z-index: 50;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <h2>Artemis II Trajectory Viewer</h2>
+    <div id="loading-status">Fetching trajectory data from JPL Horizons...</div>
+  </div>
+
+  <div id="hud">
+    <div id="info-panel">
+      <h1>ARTEMIS II &mdash; ORION</h1>
+      <div class="stat"><span class="stat-label">Distance from Earth</span><span class="stat-value" id="dist-earth">&mdash;</span></div>
+      <div class="stat"><span class="stat-label">Distance from Moon</span><span class="stat-value" id="dist-moon">&mdash;</span></div>
+      <div class="stat"><span class="stat-label">Velocity</span><span class="stat-value" id="velocity">&mdash;</span></div>
+      <div class="stat"><span class="stat-label">Altitude (Earth)</span><span class="stat-value" id="altitude">&mdash;</span></div>
+      <div class="stat" style="margin-top:8px; border-top: 1px solid rgba(100,140,255,0.15); padding-top:8px">
+        <span class="stat-label">Data source</span><span class="stat-value" id="data-source">Horizons ephemeris</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Last update</span><span class="stat-value" id="data-age"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls-panel">
+    <div id="live-status-row"><span id="live-status"></span></div>
+    <div id="timeline-row">
+      <span id="time-label">--</span>
+      <input type="range" id="timeline" min="0" max="1000" value="0">
+      <span id="met-label">MET: --</span>
+    </div>
+    <div id="btn-row">
+      <button class="btn" id="btn-live"><span class="live-dot"></span>LIVE</button>
+      <button class="btn" id="btn-play">&#9654; Play</button>
+      <button class="btn" id="btn-slower">&laquo;</button>
+      <button class="btn" id="btn-faster">&raquo;</button>
+      <span id="speed-display">1x</span>
+      <div id="focus-btns">
+        <button class="btn" id="focus-earth">Earth</button>
+        <button class="btn active" id="focus-orion">Orion</button>
+        <button class="btn" id="focus-moon">Moon</button>
+        <button class="btn" id="focus-free">Free</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tooltip"></div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.171.0",
+        "three/addons/": "https://esm.sh/three@0.171.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
