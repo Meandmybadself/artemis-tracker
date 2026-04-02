@@ -177,7 +177,7 @@ let liveMode = false;
 let liveTelemetry = null; // latest from NASA AROW
 let prevLiveTelemetry = null; // previous sample for interpolation
 let liveTelemetryTime = 0; // performance.now() when liveTelemetry was received
-let lastTelemetryFetch = 0;
+let lastTelemetryFetch = -Infinity;
 let speedMultiplier = 60; // 1 real second = 60 mission seconds
 const speedSteps = [1, 10, 30, 60, 120, 300, 600, 1800, 3600];
 let speedIdx = 3;
@@ -288,6 +288,7 @@ async function init() {
     buildTrajectoryLines();
     elLoading.style.display = 'none';
     lastRealTime = performance.now();
+    if (liveMode) pollTelemetry();
     animate();
   } catch (err) {
     elLoadingStatus.textContent = `Error: ${err.message}`;
