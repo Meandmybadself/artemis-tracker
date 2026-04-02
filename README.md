@@ -1,5 +1,9 @@
 # Artemis II Trajectory Tracker
 
+![App screenshot](public/app.jpg)
+
+![Running on a TV](public/preview_50.jpg)
+
 A real-time 2D trajectory display for NASA's Artemis II mission, rendered as a retro CRT terminal. Displays Orion's position on a top-down orbital diagram using two data sources:
 
 1. **JPL Horizons ephemeris** — pre-fetched predicted trajectory for the full ~9-day mission
