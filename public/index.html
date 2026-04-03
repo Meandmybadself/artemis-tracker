@@ -131,11 +131,25 @@
       border-bottom: 1px solid var(--border);
       letter-spacing: 1px;
     }
-    #canvas {
+    #canvas-wrap {
       flex: 1;
-      display: block;
+      position: relative;
       min-height: 0;
+    }
+    #canvas {
+      display: block;
       width: 100%;
+      height: 100%;
+    }
+    #model-canvas {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 140px;
+      height: 140px;
+      pointer-events: none;
+      filter: drop-shadow(0 0 6px #00ff41) blur(0.4px);
+      opacity: 0.85;
     }
 
     /* ── Data panels (right) ─────────────────────────────────── */
@@ -392,7 +406,10 @@
       <!-- Left: orbital canvas -->
       <div id="orbital-section">
         <div class="section-label">╠══ ORBITAL DISPLAY ══════════════╣</div>
-        <canvas id="canvas"></canvas>
+        <div id="canvas-wrap">
+          <canvas id="canvas"></canvas>
+          <canvas id="model-canvas"></canvas>
+        </div>
       </div>
 
       <!-- Right: data panels -->
@@ -410,7 +427,7 @@
 
         <div class="data-panel">
           <div class="panel-hdr">╔═ DATALINK ═╗</div>
-          <div class="stat-grid">
+          <div class="stat-grid" style="grid-template-columns: 1fr 1fr;">
             <div class="stat-cell"><span class="lbl">SOURCE</span><span class="val" id="data-source">HORIZONS</span></div>
             <div class="stat-cell"><span class="lbl">LAST UPDATE</span><span class="val" id="data-age">——</span></div>
           </div>
@@ -507,5 +524,6 @@
   </div>
 
   <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/model.js"></script>
 </body>
 </html>
