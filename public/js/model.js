@@ -48,7 +48,8 @@ new GLTFLoader().load('/models/orion.glb', (gltf) => {
 function animate() {
   requestAnimationFrame(animate);
   pivot.rotation.y += 0.008;
-  pivot.rotation.x  = 0.3;
+  pivot.rotation.x += 0.003;
+  pivot.rotation.z += 0.002;
   renderer.render(scene, camera);
 }
 animate();

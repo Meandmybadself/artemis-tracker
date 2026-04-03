@@ -807,8 +807,14 @@ function animate() {
 
   let orionState, usedLive = false;
   if (liveMode && liveTelemetry) {
-    orionState = getLiveState();
-    usedLive   = true;
+    const live = getLiveState();
+    const dist = live ? Math.sqrt(live.x**2 + live.y**2 + live.z**2) : 0;
+    if (live && dist > 6371) {   // sanity check: must be outside Earth's surface
+      orionState = live;
+      usedLive   = true;
+    } else {
+      orionState = interpolate(data.orion, currentTime);
+    }
   } else {
     orionState = interpolate(data.orion, currentTime);
   }
