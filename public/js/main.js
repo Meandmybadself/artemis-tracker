@@ -487,6 +487,13 @@ function drawOrion(orionState) {
   const blink    = (Date.now() % 1000) < 600; // 60 % duty cycle
   const s        = 9;
 
+  // Clear trail glow beneath marker so crosshair renders visually on top
+  ctx.fillStyle  = C.bg;
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(ox, oy, s + 4, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.strokeStyle = blink ? C.green : C.dim;
   ctx.lineWidth   = blink ? 1.5 : 1;
   ctx.shadowColor = C.green;
