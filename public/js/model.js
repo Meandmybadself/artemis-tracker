@@ -46,7 +46,7 @@ new GLTFLoader().load('/models/orion.glb', (gltf) => {
   });
 
   wires.position.sub(center);
-  wires.scale.setScalar(5.126 / size);
+  wires.scale.setScalar(5.639 / size);
   pivot.add(wires);
 });
 
