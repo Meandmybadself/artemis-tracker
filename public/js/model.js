@@ -15,9 +15,8 @@ const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, W / H, 0.1, 1000);
 camera.position.set(0, 0, 6);
 
-const wireMat = new THREE.MeshBasicMaterial({
+const lineMat = new THREE.LineBasicMaterial({
   color: 0x00ff41,
-  wireframe: true,
   transparent: true,
   opacity: 0.9,
 });
@@ -29,20 +28,26 @@ new GLTFLoader().load('/models/orion.glb', (gltf) => {
   const model = gltf.scene;
 
   // Fit model into view
-  const box  = new THREE.Box3().setFromObject(model);
-  const size = box.getSize(new THREE.Vector3()).length();
+  const box    = new THREE.Box3().setFromObject(model);
+  const size   = box.getSize(new THREE.Vector3()).length();
   const center = box.getCenter(new THREE.Vector3());
-  model.position.sub(center);
-  model.scale.setScalar(3.5 / size);
 
-  // Replace all materials with green wireframe
+  // Convert every mesh to a wireframe LineSegments (no filled faces)
+  const wires = new THREE.Group();
   model.traverse((node) => {
     if (node.isMesh) {
-      node.material = wireMat;
+      const geo  = new THREE.WireframeGeometry(node.geometry);
+      const line = new THREE.LineSegments(geo, lineMat);
+      line.position.copy(node.getWorldPosition(new THREE.Vector3()));
+      line.rotation.copy(node.getWorldQuaternion(new THREE.Quaternion()));
+      line.scale.copy(node.getWorldScale(new THREE.Vector3()));
+      wires.add(line);
     }
   });
 
-  pivot.add(model);
+  wires.position.sub(center);
+  wires.scale.setScalar(3.5 / size);
+  pivot.add(wires);
 });
 
 function animate() {
