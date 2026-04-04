@@ -383,6 +383,10 @@ function drawTrajectory(orionState) {
   if (!data) return;
   const currentT = currentTime.getTime();
 
+  // Always use the JPL-interpolated position for trail endpoints so the
+  // trail follows the planned trajectory regardless of live telemetry offset.
+  const jplCurrent = interpolate(data.orion, currentTime);
+
   // ── Past trajectory (phosphor trail, fading to dim) ──
   // Collect points up to current time
   const pastPts = [];
@@ -390,8 +394,8 @@ function drawTrajectory(orionState) {
     if (p.date.getTime() > currentT) break;
     pastPts.push(p);
   }
-  // Add interpolated current position as final point
-  pastPts.push(orionState);
+  // Add JPL-interpolated current position as final trail point
+  pastPts.push(jplCurrent);
 
   if (pastPts.length > 1) {
     // Draw bright "hot" tail for last segment of trail
@@ -429,7 +433,7 @@ function drawTrajectory(orionState) {
   }
 
   // ── Future trajectory (projected path — visible dashed) ──
-  const [ou, ov] = proj2D(orionState.x, orionState.y, orionState.z);
+  const [ou, ov] = proj2D(jplCurrent.x, jplCurrent.y, jplCurrent.z);
   ctx.beginPath();
   let firstFuture = true;
   for (const p of data.orion) {
